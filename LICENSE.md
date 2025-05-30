@@ -1,8 +1,9 @@
-# License for Discord-MusicBot
+# License for Yinkan MusicBot
 
-- The credits should not be changed.
-- The bot-code should be used for **private hosting** and **personal usage** only.
-- Using the code for public usage is **not allowed**.
+- **Credits must remain intact**. Any modification or removal of original credits is strictly prohibited.
+- This bot is intended solely for **private hosting** and **personal use**.
+- **Public deployment or usage** of this bot is **not permitted** under this license.
 
-> **Note:** if you are found to be violating any of the above stated rule you might be asked to takedown your bot, happy
-> listening!! Incase of any doubts in the license contact owner.
+> **Notice:** Any breach of the above terms may result in a takedown request.  
+> Thank you for respecting the license – enjoy your music!  
+> For clarification or inquiries, please contact the project owner.
