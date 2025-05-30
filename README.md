@@ -1,83 +1,208 @@
-<h1 align="center"><img src="./assets/logo.gif" width="30px"> Discord Music Bot <img src="./assets/logo.gif" width="30px"></h1>
+# 🎵 Discord 音樂機器人部署指南
 
-## ✨Latest Updates
+本指南將協助您將Discord音樂機器人部署到各種雲端平台。
 
-v5.1 Is in development! Go check it out [HERE!](https://github.com/wtfnotavailable/Discord-MusicBot)
+## 🚀 快速開始
 
-What do you gain from it? Let us explain:
- - Completely modular docker environment for easier development and deployment
- - A WORKING DASHBOARD!!!
- - DB Integration for you to save your favorite songs in
- - Integrated self hosted Lavalink
- - Dedicated query channel
- - More commands and functionalities
- - And so much more to come!
+### 前置需求
+- Node.js 18.x 或更高版本
+- Discord 機器人令牌
+- 已配置的 `config.js` 文件
 
-## 🚧 | Prerequisites
-
-- [Node.js 16+](https://nodejs.org/en/download/)
-- [Lavalink Server](https://code.darrennathanael.com/how-to-lavalink)
-- You'll need to run `npm run deploy` or `yarn deploy`. to initialized the slash commands. _You can do this on your pc
-  locally_
-
-> NOTE: Lavalink is needed for music functionality. You need to have a working Lavalink server to make the bot work.
-
-## 📝 | Important Note if you're Switching from v4 to v5
-
-1. Download and configure v5 in a seperate folder.
-2. Kick your bot out of your server.
-3. Reinvite the Bot with the right
-   scopes. [Example Invite URL (Change CLIENT_ID)](https://discord.com/oauth2/authorize?client_id=CLIENT_ID&permissions=277083450689&scope=bot%20applications.commands)
-4. Run `npm run deploy` or `yarn deploy` to initialize the slash commands. _You can do this on your pc locally_
-
-## 📝 | Tutorial
-
-### 🐳 Docker
-You should configure the `config.js` file with the host `"lavalink"`, using the same `password` and `port` as specified in `docker/application.yml`.
-
-Build and start bot and lavalink
-```sh
-docker-compose up -d --build
-```
-### 💪🏻 Non-Docker
-> The `config.js` file should be configured first. Don't forget to add a lavalink host
-
-Install all dependencies and deploy Slash Commands
-```sh
-npm install
-npm run deploy
-```
-Start the bot
-```sh
-node index.js
+### 自動化部署
+```bash
+chmod +x deploy.sh
+./deploy.sh
 ```
 
-## 📝 | [Support Server](https://discord.gg/sbySMS7m3v)
+## 🌐 支援的部署平台
 
-If you have major coding issues with this bot, please join and ask for help.
+### 1. Railway.app (推薦) - 免費額度
+**優點**: 簡單部署、自動擴容、免費額度充足
+**適合**: 新手用戶
 
-## 📸 | Screenshots
+```bash
+# 安裝 Railway CLI
+npm install -g @railway/cli
 
-Soon
+# 登入
+railway login
 
-## 🚀 | Deploy
+# 初始化專案
+railway init
 
-[![Deploy to heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/SudhanPlayz/Discord-MusicBot/tree/v5)
-[![Open in Gitpod](https://camo.githubusercontent.com/76e60919474807718793857d8eb615e7a50b18b04050577e5a35c19421f260a3/68747470733a2f2f676974706f642e696f2f627574746f6e2f6f70656e2d696e2d676974706f642e737667)](https://gitpod.io/#https://github.com/SudhanPlayz/Discord-MusicBot/tree/v5)
+# 部署
+railway up
+```
 
-## ✨ | Contributors
+**環境變數設定**:
+1. 進入 Railway 控制台
+2. 選擇您的專案
+3. 進入 Variables 頁面
+4. 添加必要的環境變數
 
-Contributions are always welcomed :D Make sure to follow [Contributing.md](/CONTRIBUTING.md)
+### 2. Render.com - 免費額度
+**優點**: 完全免費、簡單易用
+**缺點**: 可能有休眠機制
 
-<a href="https://github.com/SudhanPlayz/Discord-MusicBot/graphs/contributors">
-  <img src="https://contributors-img.web.app/image?repo=SudhanPlayz/Discord-MusicBot" />
-</a>
+1. 將代碼推送到 GitHub
+2. 連接 Render 帳戶到 GitHub
+3. 創建新的 Web Service
+4. 選擇您的 repository
+5. 使用以下設定:
+   - Build Command: `npm install`
+   - Start Command: `node index.js`
 
-## 🌟 | Made with
+### 3. Heroku - 付費平台
+**注意**: Heroku 已取消免費方案
 
-- [Discord.js](https://discord.js.org/)
-- [Lavalink](https://github.com/freyacodes/Lavalink) with erela.js
-- [Express](https://expressjs.com/)
-- [Next JS](https://nextjs.org/)
-- [Next UI](https://nextui.org)
-- [Material UI Icons](https://mui.com/material-ui/material-icons/)
+```bash
+# 安裝 Heroku CLI
+# 登入
+heroku login
+
+# 創建應用
+heroku create your-bot-name
+
+# 部署
+git push heroku main
+
+# 設定環境變數
+heroku config:set NODE_ENV=production
+```
+
+### 4. DigitalOcean App Platform - 付費平台
+1. 登入 DigitalOcean 控制台
+2. 創建新的 App
+3. 連接您的 GitHub repository
+4. 使用提供的 `.do/app.yaml` 配置
+
+### 5. Fly.io - 免費額度
+```bash
+# 安裝 Fly CLI
+# 登入
+fly auth login
+
+# 初始化
+fly launch
+
+# 部署
+fly deploy
+```
+
+## 🐳 Docker 部署
+
+### 本地 Docker 運行
+```bash
+# 建構映像
+docker build -t discord-music-bot .
+
+# 運行容器
+docker run -d --name discord-bot discord-music-bot
+```
+
+### Docker Compose
+```bash
+# 啟動
+docker-compose up -d
+
+# 查看日誌
+docker-compose logs -f
+
+# 停止
+docker-compose down
+```
+
+## ⚙️ 環境變數配置
+
+在雲端平台上，您需要設定以下環境變數：
+
+| 變數名稱 | 說明 | 必需 |
+|---------|------|------|
+| `NODE_ENV` | 運行環境 (production) | 是 |
+| `DISCORD_TOKEN` | Discord 機器人令牌 | 是 |
+| `CLIENT_ID` | Discord 應用程式 ID | 是 |
+
+## 🔍 故障排除
+
+### 常見問題
+
+**1. 機器人無法連線到 Discord**
+- 檢查令牌是否正確
+- 確認機器人已被邀請到伺服器
+- 檢查機器人權限
+
+**2. 音樂無法播放**
+- 確認 FFmpeg 已安裝（Docker 映像已包含）
+- 檢查語音頻道權限
+- 確認網路連線穩定
+
+**3. 指令無法載入**
+- 檢查 deploy 腳本是否執行成功
+- 確認機器人有 applications.commands 權限
+
+### 日誌查看
+
+**Docker Compose**:
+```bash
+docker-compose logs -f discord-bot
+```
+
+**Railway**:
+在控制台的 Deployments 頁面查看日誌
+
+**Render**:
+在控制台的 Logs 頁面查看實時日誌
+
+## 🔧 性能優化
+
+### 記憶體優化
+- 使用 Alpine Linux 基底映像（已配置）
+- 定期清理快取和臨時文件
+- 監控記憶體使用量
+
+### 網路優化
+- 選擇靠近目標用戶的伺服器區域
+- 使用 CDN 加速音頻內容（如適用）
+
+## 📊 監控和維護
+
+### 健康檢查
+Docker 映像已包含健康檢查，會定期驗證應用程式狀態。
+
+### 自動重啟
+所有配置都包含重啟策略，應用程式崩潰時會自動重啟。
+
+### 日誌管理
+- 使用結構化日誌格式
+- 定期輪轉日誌文件
+- 設定適當的日誌等級
+
+## 💰 成本估算
+
+| 平台 | 免費額度 | 付費方案 |
+|------|---------|---------|
+| Railway | 5美元/月 | 20美元/月起 |
+| Render | 750小時/月 | 7美元/月起 |
+| Fly.io | 2,340小時/月 | 按使用付費 |
+| DigitalOcean | 無 | 5美元/月起 |
+
+## 🆘 支援
+
+如果遇到部署問題：
+1. 檢查本指南的故障排除部分
+2. 查看平台官方文檔
+3. 檢查應用程式日誌
+4. 確認所有環境變數已正確設定
+
+## 🔐 安全建議
+
+1. **永遠不要將令牌提交到 Git**
+2. **使用環境變數儲存敏感信息**
+3. **定期輪換機器人令牌**
+4. **限制機器人權限到最小必要範圍**
+5. **啟用 2FA 保護雲端帳戶**
+
+---
+
+**祝您部署順利！ 🎉** 
