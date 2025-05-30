@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  discord-bot:
+    build: .
+    container_name: discord-music-bot
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config.js:/app/config.js:ro
+    networks:
+      - bot-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('健康檢查')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  bot-network:
+    driver: bridge
+
+volumes:
+  bot-data:
+  bot-logs:

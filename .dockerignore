@@ -1,0 +1,68 @@
+# 依賴
+node_modules
+npm-debug.log*
+
+# 日誌
+logs
+*.log
+
+# 臨時文件
+.tmp
+.temp
+
+# 環境文件
+.env
+.env.local
+.env.*.local
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# 開發文件
+README.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+LICENSE.md
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# 測試
+test
+tests
+*.test.js
+*.spec.js
+
+# 覆蓋率報告
+coverage
+
+# 建構文件
+dist
+build
+
+# 文檔
+docs
+
+# 其他
+.replit
+renovate.json
+app.json
+Procfile
+kickstartReplit.sh
