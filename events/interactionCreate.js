@@ -9,6 +9,40 @@ let prettyMs;
     prettyMs = (await import('pretty-ms')).default;
 })();
 
+// 添加重試機制的輔助函數
+async function retryOperation(operation, maxRetries = 3, delay = 1000) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            return await operation();
+        } catch (error) {
+            if (attempt === maxRetries) throw error;
+            await new Promise(resolve => setTimeout(resolve, delay * attempt));
+        }
+    }
+}
+
+// 安全的回應函數
+async function safeReply(interaction, payload, ephemeral = true) {
+    try {
+        if (!interaction) return;
+        
+        if (interaction.deferred) {
+            return await interaction.editReply(payload);
+        }
+        
+        if (interaction.replied) {
+            return await interaction.followUp({ ...payload, ephemeral });
+        }
+        
+        return await interaction.reply({ ...payload, ephemeral });
+    } catch (error) {
+        console.error('回應互動時發生錯誤:', error);
+        // 如果是未知互動錯誤，我們就忽略它
+        if (error.code === 10062) return;
+        throw error;
+    }
+}
+
 /**
  *
  * @param {import("../lib/DiscordMusicBot")} client
@@ -22,36 +56,29 @@ module.exports = {
             if (interaction.isCommand()) {
                 const command = client.commands.get(interaction.commandName);
                 if (!command) {
-                    return await interaction.reply({ 
-                        embeds: [client.ErrorEmbed("找不到此指令", "指令錯誤")],
-                        ephemeral: true 
+                    return await safeReply(interaction, { 
+                        embeds: [client.ErrorEmbed("找不到此指令", "指令錯誤")]
                     });
                 }
 
                 try {
-                    await command.execute(interaction, client);
+                    await retryOperation(async () => {
+                        await command.execute(interaction, client);
+                    });
                 } catch (error) {
-                    console.error(error);
-                    const errorEmbed = client.ErrorEmbed("執行指令時發生錯誤", "執行錯誤");
-                    
-                    if (!interaction.replied && !interaction.deferred) {
-                        await interaction.reply({ 
-                            embeds: [errorEmbed],
-                            ephemeral: true 
-                        });
-                    } else {
-                        await interaction.editReply({ 
-                            embeds: [errorEmbed],
-                            ephemeral: true 
-                        });
-                    }
+                    console.error('執行指令時發生錯誤:', error);
+                    await safeReply(interaction, { 
+                        embeds: [client.ErrorEmbed("執行指令時發生錯誤", "執行錯誤")]
+                    });
                 }
             }
 
             // 處理語音頻道控制面板
             if (interaction.isStringSelectMenu()) {
                 if (interaction.customId.startsWith('voice_control_')) {
-                    await handleVoiceChannelControl(interaction, client);
+                    await retryOperation(async () => {
+                        await handleVoiceChannelControl(interaction, client);
+                    });
                     return;
                 }
             }
@@ -60,7 +87,9 @@ module.exports = {
             if (interaction.isButton()) {
                 // 處理語音頻道快捷按鈕
                 if (interaction.customId.startsWith('voice_quick_')) {
-                    await handleVoiceChannelQuickAction(interaction, client);
+                    await retryOperation(async () => {
+                        await handleVoiceChannelQuickAction(interaction, client);
+                    });
                     return;
                 }
                 
@@ -71,215 +100,163 @@ module.exports = {
                     const member = interaction.member;
                     
                     if (!member.voice.channel) {
-                        return await interaction.reply({ 
-                            embeds: [client.ErrorEmbed("請先加入語音頻道", "語音頻道錯誤")],
-                            ephemeral: true 
+                        return await safeReply(interaction, { 
+                            embeds: [client.ErrorEmbed("請先加入語音頻道", "語音頻道錯誤")]
                         });
                     }
 
                     if (!queue) {
-                        return await interaction.reply({ 
-                            embeds: [client.ErrorEmbed("目前沒有正在播放的音樂", "播放狀態錯誤")],
-                            ephemeral: true 
+                        return await safeReply(interaction, { 
+                            embeds: [client.ErrorEmbed("目前沒有正在播放的音樂", "播放狀態錯誤")]
                         });
                     }
 
                     try {
                         await interaction.deferReply({ ephemeral: true });
 
-                        switch (interaction.customId) {
-                            case 'music_playpause':
-                                const wasPaused = queue.node.isPaused();
-                                queue.node.setPaused(!wasPaused);
-                                
-                                const pauseEmbed = client.SuccessEmbed(
-                                    wasPaused ? "音樂已恢復播放" : "音樂已暫停",
-                                    wasPaused ? "恢復播放" : "暫停播放"
-                                );
-                                await interaction.editReply({ embeds: [pauseEmbed] });
-                                
-                                // 更新原始控制面板的按鈕狀態
-                                try {
-                                    if (queue.metadata.controllerMessage) {
-                                        await client.updatePlayerController(queue.metadata.controllerMessage, queue);
-                                    }
-                                } catch (error) {
-                                    console.error('更新控制面板錯誤:', error);
-                                }
-                                break;
-
-                            case 'music_skip':
-                                if (!queue.tracks?.data?.length) {
-                                    return interaction.editReply({ 
-                                        embeds: [client.ErrorEmbed("佇列中沒有下一首歌曲", "跳過失敗")] 
-                                    });
-                                }
-                                queue.node.skip();
-                                const skipEmbed = client.SuccessEmbed("已跳過當前歌曲", "跳過歌曲");
-                                await interaction.editReply({ embeds: [skipEmbed] });
-                                break;
-
-                            case 'music_stop':
-                                queue.delete();
-                                const stopEmbed = client.SuccessEmbed("已停止播放並清空佇列", "停止播放");
-                                await interaction.editReply({ embeds: [stopEmbed] });
-                                break;
-
-                            case 'music_previous':
-                                if (!queue.history?.tracks?.length) {
-                                    return interaction.editReply({ 
-                                        embeds: [client.ErrorEmbed("沒有上一首歌曲", "回到上一首失敗")] 
-                                    });
-                                }
-                                await queue.history.back();
-                                const prevEmbed = client.SuccessEmbed("已返回上一首歌曲", "上一首");
-                                await interaction.editReply({ embeds: [prevEmbed] });
-                                break;
-
-                            case 'music_nowplaying':
-                                // 獲取當前播放信息
-                                const track = queue.currentTrack;
-                                
-                                // 檢查是否有當前播放的歌曲
-                                if (!track) {
-                                    return interaction.editReply({
-                                        embeds: [client.ErrorEmbed("目前沒有正在播放的音樂", "播放狀態")]
-                                    });
-                                }
-                                
-                                // 創建播放進度條
-                                function createProgressBar(current, total, length = 20) {
-                                    if (!current || !total || total === 0) return "▬".repeat(length);
+                        await retryOperation(async () => {
+                            switch (interaction.customId) {
+                                case 'music_playpause':
+                                    const wasPaused = queue.node.isPaused();
+                                    queue.node.setPaused(!wasPaused);
                                     
-                                    const progress = current / total;
-                                    const filledLength = Math.round(length * progress);
-                                    const filled = "▰".repeat(filledLength);
-                                    const empty = "▱".repeat(length - filledLength);
+                                    const pauseEmbed = client.SuccessEmbed(
+                                        wasPaused ? "音樂已恢復播放" : "音樂已暫停",
+                                        wasPaused ? "恢復播放" : "暫停播放"
+                                    );
+                                    await interaction.editReply({ embeds: [pauseEmbed] });
                                     
-                                    return filled + empty;
-                                }
-
-                                // 獲取播放時間信息
-                                const timestamp = queue.node.getTimestamp();
-                                const current = timestamp ? timestamp.current.value : 0;
-                                const total = track.durationMS || 0;
-                                
-                                let currentTime = "0:00";
-                                let totalTime = track.duration || "未知";
-                                let progressBar = "▬".repeat(20);
-                                
-                                if (prettyMs && current && total) {
+                                    // 更新原始控制面板的按鈕狀態
                                     try {
-                                        currentTime = prettyMs(current, { colonNotation: true, secondsDecimalDigits: 0 });
-                                        totalTime = prettyMs(total, { colonNotation: true, secondsDecimalDigits: 0 });
-                                        progressBar = createProgressBar(current, total);
-                                    } catch (error) {
-                                        console.error("格式化時間錯誤:", error);
-                                    }
-                                }
-                                
-                                const nowPlayingEmbed = client.MusicEmbed("正在播放")
-                                    .setDescription(`**[${track.title}](${track.url})**`)
-                                    .addFields([
-                                        { name: '👤 請求者', value: track.requestedBy?.toString() || '未知', inline: true },
-                                        { name: '🎤 作者', value: track.author || '未知', inline: true },
-                                        { name: '⏱️ 時長', value: totalTime, inline: true },
-                                        { 
-                                            name: '📊 播放進度', 
-                                            value: `\`${currentTime}\` ${progressBar} \`${totalTime}\``, 
-                                            inline: false 
+                                        if (queue.metadata.controllerMessage) {
+                                            await client.updatePlayerController(queue.metadata.controllerMessage, queue);
                                         }
-                                    ]);
+                                    } catch (error) {
+                                        console.error('更新控制面板錯誤:', error);
+                                    }
+                                    break;
 
-                                if (track.thumbnail) {
-                                    nowPlayingEmbed.setThumbnail(track.thumbnail);
-                                }
+                                case 'music_skip':
+                                    if (!queue.tracks?.data?.length) {
+                                        return interaction.editReply({ 
+                                            embeds: [client.ErrorEmbed("佇列中沒有下一首歌曲", "跳過失敗")] 
+                                        });
+                                    }
+                                    queue.node.skip();
+                                    const skipEmbed = client.SuccessEmbed("已跳過當前歌曲", "跳過歌曲");
+                                    await interaction.editReply({ embeds: [skipEmbed] });
+                                    break;
 
-                                if (queue.node.isPaused()) {
-                                    nowPlayingEmbed.setFooter({ text: "⏸️ 已暫停" });
-                                } else {
-                                    nowPlayingEmbed.setFooter({ text: "▶️ 播放中" });
-                                }
+                                case 'music_stop':
+                                    queue.delete();
+                                    const stopEmbed = client.SuccessEmbed("已停止播放並清空佇列", "停止播放");
+                                    await interaction.editReply({ embeds: [stopEmbed] });
+                                    break;
 
-                                await interaction.editReply({ embeds: [nowPlayingEmbed] });
-                                break;
+                                case 'music_previous':
+                                    if (!queue.history?.tracks?.length) {
+                                        return interaction.editReply({ 
+                                            embeds: [client.ErrorEmbed("沒有上一首歌曲", "回到上一首失敗")] 
+                                        });
+                                    }
+                                    await queue.history.back();
+                                    const prevEmbed = client.SuccessEmbed("已返回上一首歌曲", "上一首");
+                                    await interaction.editReply({ embeds: [prevEmbed] });
+                                    break;
 
-                            default:
-                                await interaction.editReply({
-                                    embeds: [client.ErrorEmbed("無效的按鈕操作", "按鈕錯誤")]
-                                });
-                        }
+                                case 'music_nowplaying':
+                                    // 獲取當前播放信息
+                                    const track = queue.currentTrack;
+                                    
+                                    // 檢查是否有當前播放的歌曲
+                                    if (!track) {
+                                        return interaction.editReply({
+                                            embeds: [client.ErrorEmbed("目前沒有正在播放的音樂", "播放狀態")]
+                                        });
+                                    }
+                                    
+                                    // 創建播放進度條
+                                    function createProgressBar(current, total, length = 20) {
+                                        if (!current || !total || total === 0) return "▬".repeat(length);
+                                        
+                                        const progress = current / total;
+                                        const filledLength = Math.round(length * progress);
+                                        const filled = "▰".repeat(filledLength);
+                                        const empty = "▱".repeat(length - filledLength);
+                                        
+                                        return filled + empty;
+                                    }
+
+                                    // 獲取播放時間信息
+                                    const timestamp = queue.node.getTimestamp();
+                                    const current = timestamp ? timestamp.current.value : 0;
+                                    const total = track.durationMS || 0;
+                                    
+                                    let currentTime = "0:00";
+                                    let totalTime = track.duration || "未知";
+                                    let progressBar = "▬".repeat(20);
+                                    
+                                    if (prettyMs && current && total) {
+                                        try {
+                                            currentTime = prettyMs(current, { colonNotation: true, secondsDecimalDigits: 0 });
+                                            totalTime = prettyMs(total, { colonNotation: true, secondsDecimalDigits: 0 });
+                                            progressBar = createProgressBar(current, total);
+                                        } catch (error) {
+                                            console.error("格式化時間錯誤:", error);
+                                        }
+                                    }
+                                    
+                                    const nowPlayingEmbed = client.MusicEmbed("正在播放")
+                                        .setDescription(`**[${track.title}](${track.url})**`)
+                                        .addFields([
+                                            { name: '👤 請求者', value: track.requestedBy?.toString() || '未知', inline: true },
+                                            { name: '🎤 作者', value: track.author || '未知', inline: true },
+                                            { name: '⏱️ 時長', value: totalTime, inline: true },
+                                            { 
+                                                name: '📊 播放進度', 
+                                                value: `\`${currentTime}\` ${progressBar} \`${totalTime}\``, 
+                                                inline: false 
+                                            }
+                                        ]);
+
+                                    if (track.thumbnail) {
+                                        nowPlayingEmbed.setThumbnail(track.thumbnail);
+                                    }
+
+                                    if (queue.node.isPaused()) {
+                                        nowPlayingEmbed.setFooter({ text: "⏸️ 已暫停" });
+                                    } else {
+                                        nowPlayingEmbed.setFooter({ text: "▶️ 播放中" });
+                                    }
+
+                                    await interaction.editReply({ embeds: [nowPlayingEmbed] });
+                                    break;
+
+                                default:
+                                    await interaction.editReply({
+                                        embeds: [client.ErrorEmbed("無效的按鈕操作", "按鈕錯誤")]
+                                    });
+                            }
+                        });
                     } catch (error) {
                         console.error('按鈕互動錯誤：', error);
-                        
-                        // 檢查互動是否已經被延遲回應
-                        if (interaction.deferred) {
-                            try {
-                                await interaction.editReply({
-                                    embeds: [client.ErrorEmbed("處理按鈕操作時發生錯誤", "操作錯誤")]
-                                });
-                            } catch (replyError) {
-                                console.error('編輯按鈕互動回應時發生錯誤:', replyError);
-                            }
-                        } else if (!interaction.replied) {
-                            try {
-                                await interaction.reply({
-                                    embeds: [client.ErrorEmbed("處理按鈕操作時發生錯誤", "操作錯誤")],
-                                    ephemeral: true
-                                });
-                            } catch (replyError) {
-                                console.error('回應按鈕互動時發生錯誤:', replyError);
-                            }
-                        }
+                        await safeReply(interaction, {
+                            embeds: [client.ErrorEmbed("處理按鈕操作時發生錯誤", "操作錯誤")]
+                        });
                     }
                 }
             }
 
             if (interaction.isAutocomplete()) {
-                const url = interaction.options.getString("query")
-                if (url === "") return;
-
-                const match = [
-                    /^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube(-nocookie)?\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/,
-                    /^(?:spotify:|https:\/\/[a-z]+\.spotify\.com\/(track\/|user\/(.*)\/playlist\/|playlist\/))(.*)$/,
-                    /^https?:\/\/(?:www\.)?deezer\.com\/[a-z]+\/(track|album|playlist)\/(\d+)$/,
-                    /^(?:(https?):\/\/)?(?:(?:www|m)\.)?(soundcloud\.com|snd\.sc)\/(.*)$/,
-                    /(?:https:\/\/music\.apple\.com\/)(?:.+)?(artist|album|music-video|playlist)\/([\w\-\.]+(\/)+[\w\-\.]+|[^&]+)\/([\w\-\.]+(\/)+[\w\-\.]+|[^&]+)/
-                ].some(function (match) {
-                    return match.test(url) == true;
-                });
-
-                async function checkRegex() {
-                    if (match == true) {
-                        let choice = []
-                        choice.push({ name: url, value: url })
-                        await interaction.respond(choice).catch(() => { });
-                    }
-                }
-
-                const Random = "ytsearch"[Math.floor(Math.random() * "ytsearch".length)];
-
-                if (interaction.commandName == "play") {
-                    checkRegex()
-                    let choice = []
-                    await yt.search(url || Random, { safeSearch: false, limit: 25 }).then(result => {
-                        result.forEach(x => { choice.push({ name: x.title, value: x.url }) })
-                    });
-                    return await interaction.respond(choice).catch(() => { });
-                } else if (result.loadType === "LOAD_FAILED" || "NO_MATCHES")
-                    return;
+                await handleAutocomplete(interaction, client);
+                return;
             }
         } catch (error) {
             console.error('互動處理錯誤：', error);
             if (!interaction.replied && !interaction.deferred) {
-                try {
-                    await interaction.reply({
-                        embeds: [client.ErrorEmbed("處理互動時發生錯誤", "系統錯誤")],
-                        ephemeral: true
-                    });
-                } catch (replyError) {
-                    console.error('回應互動時發生錯誤:', replyError);
-                }
+                await safeReply(interaction, {
+                    embeds: [client.ErrorEmbed("處理互動時發生錯誤", "系統錯誤")]
+                }).catch(() => {});
             }
         }
     }
@@ -459,5 +436,83 @@ async function handleVoiceChannelQuickAction(interaction, client) {
             embeds: [client.ErrorEmbed("處理請求時發生錯誤", "操作失敗")],
             ephemeral: true
         }).catch(() => {});
+    }
+}
+
+// 添加自動完成處理函數
+async function handleAutocomplete(interaction, client) {
+    const url = interaction.options.getString("query");
+    if (!url) {
+        return await interaction.respond([]).catch(() => {});
+    }
+
+    try {
+        // 設定較短的超時時間
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Autocomplete timeout')), 3000);
+        });
+
+        const searchPromise = (async () => {
+            const match = [
+                /^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube(-nocookie)?\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/,
+                /^(?:spotify:|https:\/\/[a-z]+\.spotify\.com\/(track\/|user\/(.*)\/playlist\/|playlist\/))(.*)$/,
+                /^https?:\/\/(?:www\.)?deezer\.com\/[a-z]+\/(track|album|playlist)\/(\d+)$/,
+                /^(?:(https?):\/\/)?(?:(?:www|m)\.)?(soundcloud\.com|snd\.sc)\/(.*)$/,
+                /(?:https:\/\/music\.apple\.com\/)(?:.+)?(artist|album|music-video|playlist)\/([\w\-\.]+(\/)+[\w\-\.]+|[^&]+)\/([\w\-\.]+(\/)+[\w\-\.]+|[^&]+)/
+            ].some(pattern => pattern.test(url));
+
+            if (match) {
+                return [{ name: url, value: url }];
+            }
+
+            if (interaction.commandName === "play") {
+                try {
+                    const results = await yt.search(url, { 
+                        safeSearch: false, 
+                        limit: 10 // 減少結果數量以加快響應
+                    });
+                    return results.map(x => ({ 
+                        name: x.title.slice(0, 100), // 限制標題長度
+                        value: x.url 
+                    }));
+                } catch (error) {
+                    console.error('YouTube 搜尋錯誤：', error);
+                    // 返回空結果而不是拋出錯誤
+                    return [];
+                }
+            }
+            return [];
+        })();
+
+        // 使用 Promise.race 來處理超時
+        const results = await Promise.race([searchPromise, timeoutPromise]);
+        
+        // 確保結果是有效的陣列
+        const validResults = Array.isArray(results) ? results : [];
+        
+        // 使用重試機制發送回應
+        await retryOperation(async () => {
+            if (!interaction.responded) {
+                await interaction.respond(validResults);
+            }
+        }, 2, 500); // 最多重試2次，每次間隔500ms
+
+    } catch (error) {
+        console.error('自動完成處理錯誤：', error);
+        
+        // 如果是超時錯誤，返回空結果
+        if (error.message === 'Autocomplete timeout' || error.code === 'UND_ERR_CONNECT_TIMEOUT') {
+            console.log('自動完成超時，返回空結果');
+        }
+        
+        // 確保在錯誤情況下也能回應
+        try {
+            if (!interaction.responded) {
+                await interaction.respond([]);
+            }
+        } catch (respondError) {
+            // 忽略最終的回應錯誤
+            console.error('無法發送自動完成回應：', respondError);
+        }
     }
 }
