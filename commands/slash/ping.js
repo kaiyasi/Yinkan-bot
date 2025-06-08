@@ -1,63 +1,96 @@
-const { MessageEmbed } = require("discord.js");
+const SlashCommand = require("../../lib/SlashCommand");
+const { EmbedBuilder } = require("discord.js");
 
-module.exports = {
-    name: "ping",
-    description: "顯示機器人的延遲資訊",
-    run: async (client, interaction) => {
-        let msg = await interaction.channel.send({
-            embeds: [
-                new MessageEmbed()
-                    .setDescription("檢查中...")
-                    .setColor("#FFD700")
-            ]
+const command = new SlashCommand()
+  .setName("ping")
+  .setDescription("顯示機器人的延遲資訊")
+  .setRun(async (client, interaction) => {
+    try {
+      // 先回應一個檢查中的訊息
+      await interaction.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setDescription("🏓 檢查延遲中...")
+            .setColor("#FFD700")
+        ]
+      });
+
+      // 獲取回應時間
+      const sent = await interaction.fetchReply();
+      const ping = sent.createdTimestamp - interaction.createdTimestamp;
+
+      // 定義延遲狀態顏色和圖示
+      const getStatusIcon = (latency) => {
+        if (latency < 100) return "🟢"; // 綠色 - 良好
+        if (latency < 200) return "🟡"; // 黃色 - 普通
+        return "🔴"; // 紅色 - 較差
+      };
+
+      const getStatusText = (latency) => {
+        if (latency < 100) return "優秀";
+        if (latency < 200) return "良好";
+        if (latency < 300) return "普通";
+        return "較差";
+      };
+
+      const apiPing = client.ws.ping;
+      const botPing = ping;
+
+      const apiIcon = getStatusIcon(apiPing);
+      const botIcon = getStatusIcon(botPing);
+
+      const apiStatus = getStatusText(apiPing);
+      const botStatus = getStatusText(botPing);
+
+      // 更新回應
+      await interaction.editReply({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle("🏓 Pong!")
+            .setDescription("延遲測試完成")
+            .addFields(
+              {
+                name: "📡 API 延遲",
+                value: `${apiIcon} **${apiPing}ms** (${apiStatus})`,
+                inline: true,
+              },
+              {
+                name: "🤖 機器人延遲",
+                value: `${botIcon} **${botPing}ms** (${botStatus})`,
+                inline: true,
+              },
+              {
+                name: "📊 狀態",
+                value: apiPing < 200 && botPing < 200 ? "🟢 運行順暢" : "🟡 可能有延遲",
+                inline: false,
+              }
+            )
+            .setColor(apiPing < 200 && botPing < 200 ? "#00FF00" : "#FFD700")
+            .setFooter({ 
+              text: `由 ${interaction.user.tag} 請求`,
+              iconURL: interaction.user.displayAvatarURL()
+            })
+            .setTimestamp()
+        ]
+      });
+
+    } catch (error) {
+      console.error("Ping 指令錯誤:", error);
+      
+      try {
+        await interaction.editReply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor("#FF0000")
+              .setTitle("❌ 錯誤")
+              .setDescription("無法獲取延遲資訊")
+              .setTimestamp()
+          ]
         });
+      } catch (editError) {
+        console.error("無法編輯 ping 回應:", editError);
+      }
+    }
+  });
 
-        let green = "🟢";
-        let red = "🔴";
-        let yellow = "🟡";
-
-        var 機器人狀態 = green;
-        var API狀態 = green;
-
-        let API延遲 = client.ws.ping;
-        let 機器人延遲 = Math.floor(msg.createdAt - interaction.createdAt);
-
-        if (API延遲 >= 40 && API延遲 < 200) {
-            API狀態 = green;
-        } else if (API延遲 >= 200 && API延遲 < 400) {
-            API狀態 = yellow;
-        } else if (API延遲 >= 400) {
-            API狀態 = red;
-        }
-
-        if (機器人延遲 >= 40 && 機器人延遲 < 200) {
-            機器人狀態 = green;
-        } else if (機器人延遲 >= 200 && 機器人延遲 < 400) {
-            機器人狀態 = yellow;
-        } else if (機器人延遲 >= 400) {
-            機器人狀態 = red;
-        }
-
-        msg.delete();
-        interaction.reply({
-            embeds: [
-                new MessageEmbed()
-                    .setTitle("🏓 | Pong!")
-                    .addFields(
-                        {
-                            name: "API 延遲",
-                            value: `\`\`\`yml\n${API狀態} | ${API延遲}ms\`\`\``,
-                            inline: true,
-                        },
-                        {
-                            name: "機器人延遲", 
-                            value: `\`\`\`yml\n${機器人狀態} | ${機器人延遲}ms\`\`\``,
-                            inline: true,
-                        }
-                    )
-                    .setColor("#FFD700")
-                    .setFooter({ text: `由 ${interaction.member.user.tag} 請求` })
-            ]
-        });
-    },
-};
+module.exports = command;

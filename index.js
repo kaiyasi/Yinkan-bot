@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, Collection, EmbedBuilder } = require('discord.js');
 const { Player } = require('discord-player');
+const { DefaultExtractors } = require('@discord-player/extractor'); // 新增這行
 const path = require('path');
 
 // 處理未捕捉的 Promise 拒絕
@@ -43,14 +44,24 @@ class MusicBot extends Client {
         process.env.OPUS_ENGINE = '@discordjs/opus';
         console.log('🔧 強制使用 @discordjs/opus 編碼器');
 
-        // 初始化 Discord Player 並配置選項
+        // 載入自定義提取器
+        let EnhancedYouTubeExtractor;
+        try {
+            // 嘗試載入自定義提取器
+            EnhancedYouTubeExtractor = require('./extractors').EnhancedYouTubeExtractor;
+            console.log('✅ 已成功載入自定義提取器類');
+        } catch (error) {
+            console.error('❌ 載入自定義提取器失敗:', error.message);
+        }
+
+        // 修改 constructor 中的 player 初始化
         this.player = new Player(this, {
-            skipFFmpeg: false, // 重新啟用 FFmpeg 進行音訊處理
+            skipFFmpeg: false,
             lagMonitor: 5000,
             connectionTimeout: 30000,
             useLegacyFFmpeg: false,
             ytdlOptions: {
-                quality: 'highestaudio', // 改回高品質音訊
+                quality: 'highestaudio',
                 filter: 'audioonly',
                 highWaterMark: 1 << 25,
                 requestOptions: {
@@ -59,15 +70,19 @@ class MusicBot extends Client {
                     }
                 }
             },
-            // 修改音訊配置
             audioPlayerOptions: {
                 seek: 0,
-                volume: 1.0, // 使用 1.0 而不是百分比
+                volume: 1.0,
                 bufferingTimeout: 5000,
                 connectionTimeout: 30000
             }
         });
         
+        // 使用 setupExtractors 方法初始化提取器 (異步)
+        // 不要在建構函數中直接調用異步方法，只保存提取器類
+        this.enhancedExtractor = EnhancedYouTubeExtractor;
+        
+        // 設置其他事件
         this.setupPlayerEvents();
     }
 
@@ -217,19 +232,37 @@ class MusicBot extends Client {
         }
     }
 
+    // 修改 setupExtractors 方法使用新的 API
     async setupExtractors() {
-        // 直接載入所有預設提取器
-        console.log('⚙️ 載入預設音樂提取器...');
-        this.player.extractors.loadDefault();
-        
-        // 顯示已載入的 extractors
-        const extractors = this.player.extractors.store.map(ext => ext.identifier || 'unknown');
-        console.log('📋 已載入的提取器:', extractors.join(', '));
-        
-        if (extractors.length === 0) {
-            console.error('❌ 沒有提取器被載入！音樂功能可能無法使用。');
-        } else {
-            console.log(`✅ 成功載入 ${extractors.length} 個提取器`);
+        try {
+            // 使用新的 loadMulti API 載入預設提取器
+            console.log('⚙️ 載入預設音樂提取器...');
+            await this.player.extractors.loadMulti(DefaultExtractors);
+            
+            // 註冊增強型提取器 (如果存在)
+            if (this.enhancedExtractor) {
+                try {
+                    // 建立提取器實例
+                    const customExtractor = new this.enhancedExtractor();
+                    // 註冊到播放器
+                    await this.player.extractors.register(customExtractor);
+                    console.log('✅ 已註冊增強型 YouTube 提取器');
+                } catch (error) {
+                    console.error('❌ 註冊增強型提取器失敗:', error.message);
+                }
+            }
+            
+            // 顯示已載入的 extractors
+            const extractors = this.player.extractors.store.map(ext => ext.identifier || 'unknown');
+            console.log('📋 已載入的提取器:', extractors.join(', '));
+            
+            if (extractors.length === 0) {
+                console.error('❌ 沒有提取器被載入！音樂功能可能無法使用。');
+            } else {
+                console.log(`✅ 成功載入 ${extractors.length} 個提取器`);
+            }
+        } catch (error) {
+            console.error('設置提取器時出錯:', error);
         }
     }
 
@@ -462,28 +495,28 @@ class MusicBot extends Client {
                 throw new Error('未設定 Discord Bot Token！請在 config.js 中設定 token。');
             }
 
-        // 載入指令和事件
-        this.loadCommands();
-        this.loadEvents();
+            // 載入指令和事件
+            this.loadCommands();
+            this.loadEvents();
 
-            // 設置音樂提取器
+            // 設置音樂提取器 (注意這裡使用 await)
             await this.setupExtractors();
 
-        // 設置錯誤處理
-        this.on('error', error => {
-            console.error('機器人錯誤：', error);
-        });
+            // 設置錯誤處理
+            this.on('error', error => {
+                console.error('機器人錯誤：', error);
+            });
 
-        this.on('warn', warning => {
-            console.warn('機器人警告：', warning);
-        });
+            this.on('warn', warning => {
+                console.warn('機器人警告：', warning);
+            });
 
-        process.on('unhandledRejection', error => {
-            console.error('未處理的 Promise 拒絕：', error);
-        });
+            process.on('unhandledRejection', error => {
+                console.error('未處理的 Promise 拒絕：', error);
+            });
 
-        // 登入機器人
-        await this.login(this.config.token);
+            // 登入機器人
+            await this.login(this.config.token);
             console.log(`✅ 機器人已成功登入！`);
 
         } catch (error) {

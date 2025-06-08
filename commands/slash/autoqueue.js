@@ -1,10 +1,10 @@
 const colors = require("colors");
-const { MessageEmbed } = require("discord.js");
+const { EmbedBuilder } = require("discord.js");
 const SlashCommand = require("../../lib/SlashCommand");
 
 const command = new SlashCommand()
     .setName("autoqueue")
-    .setDescription("自動將歌曲添加到隊列（切換）")
+    .setDescription("設置自動佇列模式，當佇列播放完畢時自動添加相關歌曲")
     .setRun(async (client, interaction) => {
         let channel = await client.getChannel(client, interaction);
         if (!channel) {
@@ -12,12 +12,12 @@ const command = new SlashCommand()
         }
         
         let player;
-        if (client.manager) {
-            player = client.manager.players.get(interaction.guild.id);
+        if (client.player) {
+            player = client.player.nodes.get(interaction.guild.id);
         } else {
             return interaction.reply({
                 embeds: [
-                    new MessageEmbed()
+                    new EmbedBuilder()
                         .setColor("RED")
                         .setDescription("Lavalink 節點未連接"),
                 ],
@@ -27,40 +27,44 @@ const command = new SlashCommand()
         if (!player) {
             return interaction.reply({
                 embeds: [
-                    new MessageEmbed()
+                    new EmbedBuilder()
                         .setColor("RED")
-                        .setDescription("隊列中沒有正在播放的內容"),
+                        .setDescription("目前沒有正在播放內容"),
                 ],
                 ephemeral: true,
             });
         }
         
-        let autoQueueEmbed = new MessageEmbed().setColor(client.config.embedColor);
-        const autoQueue = player.get("autoQueue");
-        player.set("requester", interaction.guild.members.me);
-
-        if (!autoQueue || autoQueue === false) {
-            player.set("autoQueue", true);
+        let autoQueueEmbed = new EmbedBuilder().setColor(client.config.embedColor);
+        const autoQueue = player.metadata?.autoQueue || false;
+        
+        if (!autoQueue) {
+            if (!player.metadata) player.metadata = {};
+            player.metadata.autoQueue = true;
         } else {
-            player.set("autoQueue", false);
+            player.metadata.autoQueue = false;
         }
+        
+        const newAutoQueue = player.metadata.autoQueue;
+        
         autoQueueEmbed
-            .setDescription(`**自動隊列模式已** \`${!autoQueue ? "開啟" : "關閉"}\``)
+            .setDescription(`**自動佇列模式已** \`${newAutoQueue ? "啟用" : "關閉"}\``)
             .setFooter({
-                text: `機器人將${!autoQueue ? "現在" : "不再"}自動將歌曲添加到隊列。`
+                text: `機器人將${newAutoQueue ? "會在佇列結束時自動添加相關歌曲" : "不會自動添加歌曲到佇列"}`
             });
+            
         client.warn(
-            `播放器: ${player.options.guild} | [${colors.blue(
-                "自動隊列",
+            `播放器 ${player.guild.id} | [${colors.blue(
+                "自動佇列",
             )}] 已被 [${colors.blue(
-                !autoQueue ? "啟用" : "禁用",
+                newAutoQueue ? "啟用" : "禁用",
             )}] 在 ${
-                client.guilds.cache.get(player.options.guild)
-                    ? client.guilds.cache.get(player.options.guild).name
-                    : "一個伺服器"
+                client.guilds.cache.get(player.guild.id)
+                    ? client.guilds.cache.get(player.guild.id).name
+                    : "未知伺服器"
             }`,
         );
-
+        
         return interaction.reply({ embeds: [autoQueueEmbed] });
     });
 

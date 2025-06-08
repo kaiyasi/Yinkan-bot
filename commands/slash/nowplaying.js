@@ -1,5 +1,6 @@
 const { EmbedBuilder, escapeMarkdown } = require("discord.js");
 const SlashCommand = require("../../lib/SlashCommand");
+
 let prettyMs;
 (async () => {
     prettyMs = (await import('pretty-ms')).default;
@@ -8,56 +9,62 @@ let prettyMs;
 const command = new SlashCommand()
     .setName("nowplaying")
     .setDescription("顯示目前正在播放的歌曲")
+    .setSelfDefer(true)
     .setRun(async (client, interaction) => {
+        await interaction.deferReply();
+        
         const queue = client.player.nodes.get(interaction.guild);
         
         if (!queue || !queue.currentTrack) {
-            return interaction.reply({
-                embeds: [client.ErrorEmbed("目前沒有正在播放的音樂", "播放狀態")],
+            return interaction.editReply({
+                embeds: [client.ErrorEmbed("目前沒有正在播放音樂", "播放")],
                 ephemeral: true
             });
         }
 
         const track = queue.currentTrack;
-        
-        // 創建播放進度條
+
+        // 建立播放進度條
         function createProgressBar(current, total, length = 20) {
             if (!current || !total || total === 0) return "▬".repeat(length);
-            
             const progress = current / total;
             const filledLength = Math.round(length * progress);
-            const filled = "▰".repeat(filledLength);
-            const empty = "▱".repeat(length - filledLength);
-            
-            return filled + empty;
+            const filled = "▬".repeat(filledLength);
+            const empty = "▬".repeat(length - filledLength);
+            return filled + "🔘" + empty;
         }
 
-        // 獲取播放時間信息
+        // 取得播放時間資訊
         const timestamp = queue.node.getTimestamp();
         const current = timestamp ? timestamp.current.value : 0;
         const total = track.durationMS || 0;
-        
-        // 格式化時間
+
         let currentTime = "0:00";
         let totalTime = track.duration || "未知";
         let progressBar = "▬".repeat(20);
-        
+
         if (prettyMs && current && total) {
             try {
-                currentTime = prettyMs(current, { colonNotation: true, secondsDecimalDigits: 0 });
-                totalTime = prettyMs(total, { colonNotation: true, secondsDecimalDigits: 0 });
+                currentTime = prettyMs(current, { 
+                    colonNotation: true, 
+                    secondsDecimalDigits: 0 
+                });
+                totalTime = prettyMs(total, { 
+                    colonNotation: true, 
+                    secondsDecimalDigits: 0 
+                });
                 progressBar = createProgressBar(current, total);
             } catch (error) {
-                console.error("格式化時間錯誤:", error);
+                console.error("時間格式化錯誤:", error);
             }
         }
-        
-        const nowPlayingEmbed = client.MusicEmbed("正在播放")
-            .setDescription(`**[${track.title}](${track.url})**`)
+
+        const nowPlayingEmbed = client.MusicEmbed("🎵 正在播放")
+            .setDescription(`**[${escapeMarkdown(track.title)}](${track.url})**`)
             .addFields([
                 {
                     name: "👤 請求者",
-                    value: track.requestedBy?.toString() || "未知",
+                    value: track.requestedBy.toString() || "未知",
                     inline: true
                 },
                 {
@@ -66,7 +73,7 @@ const command = new SlashCommand()
                     inline: true
                 },
                 {
-                    name: "⏱️ 時長",
+                    name: "⏱️ 長度",
                     value: totalTime,
                     inline: true
                 },
@@ -81,13 +88,17 @@ const command = new SlashCommand()
                     inline: true
                 },
                 {
-                    name: "🔁 循環模式",
-                    value: queue.repeatMode === 0 ? "關閉" : queue.repeatMode === 1 ? "單曲循環" : "佇列循環",
+                    name: "🔄 循環模式",
+                    value: queue.repeatMode === 0 
+                        ? "關閉" 
+                        : queue.repeatMode === 1 
+                        ? "單曲循環" 
+                        : "佇列循環",
                     inline: true
                 },
                 {
-                    name: "👥 語音頻道",
-                    value: queue.connection?.channel?.name || "未知",
+                    name: "🎤 語音頻道",
+                    value: queue.connection.channel.name || "未知",
                     inline: true
                 }
             ]);
@@ -104,9 +115,8 @@ const command = new SlashCommand()
             nowPlayingEmbed.setFooter({ text: "▶️ 正在播放" });
         }
 
-        return interaction.reply({ 
-            embeds: [nowPlayingEmbed], 
-            ephemeral: true 
+        return interaction.editReply({
+            embeds: [nowPlayingEmbed]
         });
     });
 

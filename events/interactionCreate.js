@@ -10,13 +10,22 @@ let prettyMs;
 })();
 
 // 添加重試機制的輔助函數
-async function retryOperation(operation, maxRetries = 3, delay = 1000) {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+async function retryOperation(operation, maxRetries = 3) {
+    let retries = 0;
+    while (retries < maxRetries) {
         try {
             return await operation();
         } catch (error) {
-            if (attempt === maxRetries) throw error;
-            await new Promise(resolve => setTimeout(resolve, delay * attempt));
+            retries++;
+            
+            // 如果是自動完成相關操作，使用更短的等待時間
+            const isAutocomplete = error.message?.includes('autocomplete') || 
+                                operation.toString().includes('autocomplete');
+            
+            const waitTime = isAutocomplete ? 100 : 500; // 自動完成等待時間更短
+            
+            if (retries >= maxRetries) throw error;
+            await new Promise(r => setTimeout(r, waitTime));
         }
     }
 }
@@ -26,15 +35,25 @@ async function safeReply(interaction, payload, ephemeral = true) {
     try {
         if (!interaction) return;
         
+        // 將 ephemeral 轉換為標準 flags 格式
+        if (ephemeral) {
+            if (!payload.flags) {
+                payload.flags = 1 << 6; // 等同於 Discord.MessageFlags.Ephemeral (64)
+            }
+        }
+        
+        // 移除 ephemeral 屬性，使用 flags 代替
+        const { ephemeral: _, ...cleanPayload } = payload;
+        
         if (interaction.deferred) {
-            return await interaction.editReply(payload);
+            return await interaction.editReply(cleanPayload);
         }
         
         if (interaction.replied) {
-            return await interaction.followUp({ ...payload, ephemeral });
+            return await interaction.followUp(cleanPayload);
         }
         
-        return await interaction.reply({ ...payload, ephemeral });
+        return await interaction.reply(cleanPayload);
     } catch (error) {
         console.error('回應互動時發生錯誤:', error);
         // 如果是未知互動錯誤，我們就忽略它
@@ -62,17 +81,48 @@ module.exports = {
                 }
 
                 try {
-                    await retryOperation(async () => {
-                        await command.execute(interaction, client);
-                    });
+                    // 立即使用 deferReply 避免超時問題
+                    // 除非命令明確提到不需要延遲回應 (noDefer=true)
+                    // 或命令會自行處理回應 (selfDefer=true)
+                    if (!command.noDefer && !command.selfDefer) {
+                        try {
+                            await interaction.deferReply({
+                                ephemeral: command.ephemeral || false
+                            });
+                            console.log(`📝 已延遲回應: ${interaction.commandName}`);
+                        } catch (deferError) {
+                            if (deferError.code !== 10062) { // 10062 為互動已過期錯誤碼
+                                console.error('延遲回應失敗:', deferError);
+                            }
+                        }
+                    }
+                    
+                    // 執行命令
+                    await command.execute(interaction, client);
                 } catch (error) {
                     console.error('執行指令時發生錯誤:', error);
-                    await safeReply(interaction, { 
-                        embeds: [client.ErrorEmbed("執行指令時發生錯誤", "執行錯誤")]
-                    });
+                    
+                    // 處理錯誤回應，更安全地處理互動狀態
+                    try {
+                        const errorEmbed = client.ErrorEmbed("執行指令時發生錯誤", "執行錯誤");
+                        
+                        if (error.code === 10062) {
+                            // 互動已過期，記錄但不執行任何操作
+                            console.log('互動已過期，無法回應');
+                            return;
+                        }
+                        
+                        if (interaction.deferred) {
+                            await interaction.editReply({ embeds: [errorEmbed] });
+                        } else if (!interaction.replied) {
+                            await interaction.reply({ embeds: [errorEmbed], flags: 1 << 6 });
+                        }
+                    } catch (followUpError) {
+                        console.error('回應錯誤失敗:', followUpError);
+                    }
                 }
             }
-
+            
             // 處理語音頻道控制面板
             if (interaction.isStringSelectMenu()) {
                 if (interaction.customId.startsWith('voice_control_')) {
@@ -248,7 +298,7 @@ module.exports = {
             }
 
             if (interaction.isAutocomplete()) {
-                await handleAutocomplete(interaction, client);
+                await handleAutocomplete(interaction);
                 return;
             }
         } catch (error) {
@@ -439,80 +489,81 @@ async function handleVoiceChannelQuickAction(interaction, client) {
     }
 }
 
-// 添加自動完成處理函數
-async function handleAutocomplete(interaction, client) {
-    const url = interaction.options.getString("query");
-    if (!url) {
-        return await interaction.respond([]).catch(() => {});
+// 添加自動完成處理增強功能
+
+// 添加超時處理的輔助函數
+async function withTimeout(promise, timeoutMs = 1500) {
+  return new Promise((resolve) => {
+    let timeoutHandle;
+    
+    // 設定超時
+    timeoutHandle = setTimeout(() => {
+      console.log(`⚠️ 操作超時 (${timeoutMs}ms)`);
+      resolve([{ name: '搜尋中...', value: 'searching' }]);
+    }, timeoutMs);
+    
+    // 執行實際操作
+    promise
+      .then((result) => {
+        clearTimeout(timeoutHandle);
+        resolve(result);
+      })
+      .catch((error) => {
+        clearTimeout(timeoutHandle);
+        console.error('操作失敗:', error);
+        resolve([{ name: '搜尋失敗', value: 'error' }]);
+      });
+  });
+}
+
+// 處理自動完成互動
+async function handleAutocomplete(interaction) {
+  try {
+    // 檢查互動是否已經回應過
+    if (interaction.responded) return;
+    
+    const command = interaction.client.commands.get(interaction.commandName);
+    
+    // 如果命令不存在或沒有自動完成處理
+    if (!command || !command.autocomplete) {
+      return await interaction.respond([]);
     }
-
-    try {
-        // 設定較短的超時時間
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Autocomplete timeout')), 3000);
-        });
-
-        const searchPromise = (async () => {
-            const match = [
-                /^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube(-nocookie)?\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/,
-                /^(?:spotify:|https:\/\/[a-z]+\.spotify\.com\/(track\/|user\/(.*)\/playlist\/|playlist\/))(.*)$/,
-                /^https?:\/\/(?:www\.)?deezer\.com\/[a-z]+\/(track|album|playlist)\/(\d+)$/,
-                /^(?:(https?):\/\/)?(?:(?:www|m)\.)?(soundcloud\.com|snd\.sc)\/(.*)$/,
-                /(?:https:\/\/music\.apple\.com\/)(?:.+)?(artist|album|music-video|playlist)\/([\w\-\.]+(\/)+[\w\-\.]+|[^&]+)\/([\w\-\.]+(\/)+[\w\-\.]+|[^&]+)/
-            ].some(pattern => pattern.test(url));
-
-            if (match) {
-                return [{ name: url, value: url }];
-            }
-
-            if (interaction.commandName === "play") {
-                try {
-                    const results = await yt.search(url, { 
-                        safeSearch: false, 
-                        limit: 10 // 減少結果數量以加快響應
-                    });
-                    return results.map(x => ({ 
-                        name: x.title.slice(0, 100), // 限制標題長度
-                        value: x.url 
-                    }));
-                } catch (error) {
-                    console.error('YouTube 搜尋錯誤：', error);
-                    // 返回空結果而不是拋出錯誤
-                    return [];
-                }
-            }
-            return [];
-        })();
-
-        // 使用 Promise.race 來處理超時
-        const results = await Promise.race([searchPromise, timeoutPromise]);
-        
-        // 確保結果是有效的陣列
-        const validResults = Array.isArray(results) ? results : [];
-        
-        // 使用重試機制發送回應
-        await retryOperation(async () => {
-            if (!interaction.responded) {
-                await interaction.respond(validResults);
-            }
-        }, 2, 500); // 最多重試2次，每次間隔500ms
-
-    } catch (error) {
-        console.error('自動完成處理錯誤：', error);
-        
-        // 如果是超時錯誤，返回空結果
-        if (error.message === 'Autocomplete timeout' || error.code === 'UND_ERR_CONNECT_TIMEOUT') {
-            console.log('自動完成超時，返回空結果');
-        }
-        
-        // 確保在錯誤情況下也能回應
+    
+    // 使用超時保護執行自動完成 (縮短超時時間)
+    const results = await withTimeout(
+      command.autocomplete(interaction),
+      1000  // 1 秒超時，確保在 Discord 的 3 秒限制之前回應
+    );
+    
+    // 確保 results 是有效的自動完成選項數組
+    const validResults = Array.isArray(results) ? results : [];
+    
+    // 限制回應大小，避免超出 Discord 限制
+    const limitedResults = validResults.slice(0, 25);
+    
+    // 發送回應（如果尚未回應）
+    if (!interaction.responded) {
+      await interaction.respond(limitedResults);
+    }
+  } catch (error) {
+    // 對於 10062 錯誤 (Unknown interaction)，只記錄但不再重試
+    if (error.code === 10062) {
+      console.log(`⚠️ 自動完成處理: 互動已過期，無法回應 (代碼 ${error.code})`);
+      return;
+    } else {
+      console.error(`自動完成處理錯誤:`, error);
+      
+      // 嘗試給出簡單回應避免錯誤
+      if (!interaction.responded) {
         try {
-            if (!interaction.responded) {
-                await interaction.respond([]);
-            }
+          await interaction.respond([]);
         } catch (respondError) {
-            // 忽略最終的回應錯誤
-            console.error('無法發送自動完成回應：', respondError);
+          // 忽略二次回應錯誤
+          if (respondError.code !== 10062) {
+            console.error('回應失敗:', respondError);
+          }
         }
+      }
     }
+  }
 }

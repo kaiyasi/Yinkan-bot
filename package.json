@@ -16,14 +16,14 @@
     "opusscript": "$@discordjs/opus"
   },
   "dependencies": {
-    "@discord-player/extractor": "^4.5.1",
+    "@discord-player/extractor": "^7.1.0",
     "@discordjs/builders": "^1.11.2",
     "@discordjs/opus": "^0.10.0",
     "@discordjs/rest": "^2.5.0",
     "@discordjs/voice": "^0.16.1",
     "@distube/ytdl-core": "^4.16.10",
     "colors": "^1.4.0",
-    "discord-player": "^6.7.1",
+    "discord-player": "^7.1.0",
     "discord-player-youtubei": "^1.4.6",
     "discord.js": "^14.19.3",
     "dotenv": "^16.5.0",
