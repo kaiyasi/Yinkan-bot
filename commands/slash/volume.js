@@ -26,37 +26,37 @@ const command = new SlashCommand()
                             .setDescription("您需要在語音頻道中才能使用此指令")
                             .setTimestamp()
                     ],
-                    ephemeral: true
+                    flags: 1 << 6 // Discord.MessageFlags.Ephemeral
                 });
             }
 
             // 檢查播放器是否可用
             if (!client.player) {
                 return interaction.reply({
-                    embeds: [
-                        new EmbedBuilder()
+                    embeds: [                        new EmbedBuilder()
                             .setColor("#FF0000")
                             .setTitle("❌ 播放器未初始化")
                             .setDescription("Discord Player 尚未開始")
                             .setTimestamp()
                     ],
-                    ephemeral: true
+                    flags: 1 << 6 // Discord.MessageFlags.Ephemeral
                 });
             }
 
-            await interaction.deferReply();
+            // 移除手動 deferReply，因為已設置 setSelfDefer(true)
 
             // 獲取播放佇列
             const queue = client.player.nodes.get(interaction.guild.id);
             if (!queue) {
-                return interaction.editReply({
+                return interaction.reply({
                     embeds: [
                         new EmbedBuilder()
                             .setColor("#FF0000")
                             .setTitle("❌ 沒有正在播放的音樂")
                             .setDescription("目前沒有播放佇列")
                             .setTimestamp()
-                    ]
+                    ],
+                    flags: 1 << 6 // Discord.MessageFlags.Ephemeral
                 });
             }
 
@@ -197,7 +197,7 @@ const command = new SlashCommand()
             if (interaction.deferred) {
                 return interaction.editReply(errorResponse);
             } else {
-                return interaction.reply({ ...errorResponse, ephemeral: true });
+                return interaction.reply({ ...errorResponse, flags: 1 << 6 });
             }
         }
     });

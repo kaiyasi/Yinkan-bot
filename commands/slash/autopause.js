@@ -5,6 +5,7 @@ const SlashCommand = require("../../lib/SlashCommand");
 const command = new SlashCommand()
     .setName("autopause")
     .setDescription("設置機器人在語音頻道空閒時自動暫停")
+    .setSelfDefer(true)
     .setRun(async (client, interaction) => {
         let channel = await client.getChannel(client, interaction);
         if (!channel) return;

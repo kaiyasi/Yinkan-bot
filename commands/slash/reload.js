@@ -6,11 +6,11 @@ const path = require("path");
 const command = new SlashCommand()
   .setName("reload")
   .setDescription("重新載入所有指令")
+  .setSelfDefer(true)
   .setRun(async (client, interaction, options) => {
     try {
       // 檢查是否為管理員
-      if (interaction.user.id !== client.config.adminId) {
-        return interaction.reply({
+      if (interaction.user.id !== client.config.adminId) {        return interaction.reply({
           embeds: [
             new EmbedBuilder()
               .setColor("#FF0000")
@@ -18,11 +18,8 @@ const command = new SlashCommand()
               .setDescription("只有機器人管理員可以使用此指令")
               .setTimestamp()
           ],
-          ephemeral: true,
-        });
-      }
-
-      await interaction.deferReply({ ephemeral: true });
+          flags: 1 << 6, // Discord.MessageFlags.Ephemeral
+        });}
 
       let reloadCount = 0;
       const errors = [];

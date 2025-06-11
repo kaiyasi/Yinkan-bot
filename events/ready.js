@@ -34,7 +34,22 @@ module.exports = {
 
 				// 如果使用 discord-player 而不是 erela.js
 				if (client.player) {
-					console.log(colors.green('[音樂播放器] 已存在，無需初始化'));
+					console.log(colors.green('[音樂播放器] 已存在，檢查提取器狀態...'));
+					
+					// 檢查並顯示提取器狀態
+					const extractors = client.player.extractors.store.map(ext => ext.identifier || 'unknown');
+					console.log(colors.cyan('[提取器] 目前已載入的提取器:'), extractors.join(', '));
+					
+					if (extractors.length === 0) {
+						console.warn(colors.yellow('[提取器] 警告：沒有提取器被載入！嘗試重新載入...'));
+						try {
+							await client.setupExtractors();
+						} catch (error) {
+							console.error(colors.red('[提取器] 重新載入失敗:'), error);
+						}
+					} else {
+						console.log(colors.green(`[提取器] ✅ 已載入 ${extractors.length} 個提取器`));
+					}
 				}
 			}
 		} catch (error) {

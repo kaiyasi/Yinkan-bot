@@ -5,6 +5,7 @@ const SlashCommand = require("../../lib/SlashCommand");
 const command = new SlashCommand()
     .setName("247")
     .setDescription("持續播放音樂，機器人將保持連接")
+    .setSelfDefer(true)
     .setRun(async (client, interaction, options) => {
         let channel = await client.getChannel(client, interaction);
         if (!channel) {

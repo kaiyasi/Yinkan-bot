@@ -14,12 +14,12 @@ let pms;
 const command = new SlashCommand()
   .setName("queue")
   .setDescription("顯示播放佇列")
+  .setSelfDefer(true)
   .setRun(async (client, interaction) => {
     try {
       const queue = client.player.nodes.get(interaction.guild);
       
-      if (!queue || !queue.currentTrack) {
-        return interaction.reply({
+      if (!queue || !queue.currentTrack) {        return interaction.reply({
           embeds: [
             new EmbedBuilder()
               .setColor("#FF0000")
@@ -27,7 +27,7 @@ const command = new SlashCommand()
               .setDescription("目前沒有音樂在播放")
               .setTimestamp()
           ],
-          ephemeral: true
+          flags: 1 << 6 // Discord.MessageFlags.Ephemeral
         });
       }
 
@@ -62,11 +62,9 @@ const command = new SlashCommand()
 
         if (currentTrack.thumbnail) {
           emptyQueueEmbed.setThumbnail(currentTrack.thumbnail);
-        }
-
-        return interaction.reply({
+        }        return interaction.reply({
           embeds: [emptyQueueEmbed],
-          ephemeral: true
+          flags: 1 << 6 // Discord.MessageFlags.Ephemeral
         });
       }
 
@@ -150,8 +148,7 @@ const command = new SlashCommand()
     } catch (error) {
       console.error("Queue 指令錯誤:", error);
       
-      try {
-        await interaction.reply({
+      try {        await interaction.reply({
           embeds: [
             new EmbedBuilder()
               .setColor("#FF0000")
@@ -159,7 +156,7 @@ const command = new SlashCommand()
               .setDescription("獲取佇列資訊時發生錯誤，請稍後再試")
               .setTimestamp()
           ],
-          ephemeral: true
+          flags: 1 << 6 // Discord.MessageFlags.Ephemeral
         });
       } catch (replyError) {
         console.error("無法回覆 queue 指令:", replyError);

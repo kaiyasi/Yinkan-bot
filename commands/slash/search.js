@@ -24,8 +24,7 @@ const command = new SlashCommand()
   .setRun(async (client, interaction, options) => {
     try {
       // 檢查用戶是否在語音頻道
-      const voiceChannel = interaction.member.voice.channel;
-      if (!voiceChannel) {
+      const voiceChannel = interaction.member.voice.channel;      if (!voiceChannel) {
         return interaction.reply({
           embeds: [
             new EmbedBuilder()
@@ -34,11 +33,9 @@ const command = new SlashCommand()
               .setDescription("您需要在語音頻道中才能使用此指令")
               .setTimestamp()
           ],
-          ephemeral: true,
+          flags: 1 << 6 // Discord.MessageFlags.Ephemeral
         });
-      }
-
-      // 檢查機器人權限
+      }      // 檢查機器人權限
       const permissions = voiceChannel.permissionsFor(client.user);
       if (!permissions.has("Connect") || !permissions.has("Speak")) {
         return interaction.reply({
@@ -49,11 +46,9 @@ const command = new SlashCommand()
               .setDescription("機器人需要連接和說話權限")
               .setTimestamp()
           ],
-          ephemeral: true,
+          flags: 1 << 6 // Discord.MessageFlags.Ephemeral
         });
-      }
-
-      // 檢查播放器是否可用
+      }      // 檢查播放器是否可用
       if (!client.player) {
         return interaction.reply({
           embeds: [
@@ -63,13 +58,10 @@ const command = new SlashCommand()
               .setDescription("Discord Player 尚未開始")
               .setTimestamp()
           ],
-          ephemeral: true,
+          flags: 1 << 6 // Discord.MessageFlags.Ephemeral
         });
-      }
-
-      await interaction.deferReply();
-
-      const searchQuery = interaction.options.getString("query");
+      }      // 移除手動 deferReply，因為已設置 setSelfDefer(true)
+      const searchQuery = options.getString("query");
 
       // 執行搜尋
       let searchResult;
@@ -77,10 +69,8 @@ const command = new SlashCommand()
         searchResult = await client.player.search(searchQuery, {
           requestedBy: interaction.user,
           searchEngine: 'auto'
-        });
-
-        if (!searchResult || !searchResult.tracks.length) {
-          return interaction.editReply({
+        });        if (!searchResult || !searchResult.tracks.length) {
+          return interaction.reply({
             embeds: [
               new EmbedBuilder()
                 .setColor("#FF0000")
@@ -92,20 +82,20 @@ const command = new SlashCommand()
                   inline: false
                 })
                 .setTimestamp()
-            ]
+            ],
+            flags: 1 << 6 // Discord.MessageFlags.Ephemeral
           });
-        }
-
-      } catch (searchError) {
+        }      } catch (searchError) {
         console.error("搜尋錯誤:", searchError);
-        return interaction.editReply({
+        return interaction.reply({
           embeds: [
             new EmbedBuilder()
               .setColor("#FF0000")
               .setTitle("❌ 搜尋失敗")
               .setDescription("搜尋歌曲時發生錯誤，請稍後再試")
               .setTimestamp()
-          ]
+          ],
+          flags: 1 << 6 // Discord.MessageFlags.Ephemeral
         });
       }
 
@@ -159,9 +149,7 @@ const command = new SlashCommand()
           value: `找到 ${searchResult.tracks.length} 首歌曲，顯示前 ${maxResults} 首`,
           inline: false
         })
-        .setTimestamp();
-
-      const replyMessage = await interaction.editReply({
+        .setTimestamp();      const replyMessage = await interaction.reply({
         embeds: [searchEmbed],
         components: [selectMenu],
       });
@@ -259,12 +247,10 @@ const command = new SlashCommand()
             console.error("無法編輯回應:", editError);
           }
         }
-      });
-
-      collector.on("end", async (collected) => {
+      });      collector.on("end", async (collected) => {
         if (collected.size === 0) {
           try {
-            await interaction.editReply({
+            await replyMessage.edit({
               embeds: [
                 new EmbedBuilder()
                   .setColor("#FFA500")
@@ -302,7 +288,7 @@ const command = new SlashCommand()
         if (interaction.deferred) {
           await interaction.editReply(errorResponse);
         } else {
-          await interaction.reply({ ...errorResponse, ephemeral: true });
+          await interaction.reply({ ...errorResponse, flags: 1 << 6 });
         }
       } catch (replyError) {
         console.error("無法回覆 search 指令:", replyError);

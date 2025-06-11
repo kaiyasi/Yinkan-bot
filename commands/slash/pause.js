@@ -4,22 +4,17 @@ const { EmbedBuilder } = require("discord.js");
 const command = new SlashCommand()
   .setName("pause")
   .setDescription("暫停目前播放的音樂")
-  .setSelfDefer(true)
-  .setRun(async (client, interaction, options) => {
+  .setSelfDefer(true)  .setRun(async (client, interaction, options) => {
     try {
-      await interaction.deferReply();
-
       const queue = client.player.nodes.get(interaction.guild);
       if (!queue || !queue.currentTrack) {
         const noMusicEmbed = new EmbedBuilder()
           .setColor("#FF0000")
           .setTitle("❌ 沒有正在播放的音樂")
           .setDescription("目前沒有任何音樂在播放")
-          .setTimestamp();
-
-        return interaction.editReply({
+          .setTimestamp();        return interaction.editReply({
           embeds: [noMusicEmbed],
-          ephemeral: true,
+          flags: 1 << 6 // Discord.MessageFlags.Ephemeral
         });
       }
 
@@ -29,11 +24,9 @@ const command = new SlashCommand()
           .setColor("#FF0000")
           .setTitle("❌ 請先加入語音頻道")
           .setDescription("您需要在語音頻道中才能使用此指令")
-          .setTimestamp();
-
-        return interaction.editReply({
+          .setTimestamp();        return interaction.editReply({
           embeds: [noVoiceEmbed],
-          ephemeral: true,
+          flags: 1 << 6, // Discord.MessageFlags.Ephemeral
         });
       }
 
@@ -42,11 +35,9 @@ const command = new SlashCommand()
           .setColor("#FF0000")
           .setTitle("❌ 語音頻道不匹配")
           .setDescription("您需要與機器人在同一個語音頻道中")
-          .setTimestamp();
-
-        return interaction.editReply({
+          .setTimestamp();        return interaction.editReply({
           embeds: [differentChannelEmbed],
-          ephemeral: true,
+          flags: 1 << 6, // Discord.MessageFlags.Ephemeral
         });
       }
 
@@ -55,11 +46,9 @@ const command = new SlashCommand()
           .setColor("#FFA500")
           .setTitle("⚠️ 音樂已經暫停")
           .setDescription("音樂播放已經處於暫停狀態")
-          .setTimestamp();
-
-        return interaction.editReply({
+          .setTimestamp();        return interaction.editReply({
           embeds: [alreadyPausedEmbed],
-          ephemeral: true,
+          flags: 1 << 6, // Discord.MessageFlags.Ephemeral
         });
       }
 
@@ -88,10 +77,9 @@ const command = new SlashCommand()
         .setDescription("暫停音樂時發生錯誤，請稍後再試")
         .setTimestamp();
 
-      try {
-        return interaction.editReply({
+      try {        return interaction.editReply({
           embeds: [errorEmbed],
-          ephemeral: true,
+          flags: 1 << 6, // Discord.MessageFlags.Ephemeral
         });
       } catch (followUpError) {
         console.error("無法回覆互動:", followUpError);

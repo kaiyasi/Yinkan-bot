@@ -9,8 +9,7 @@ const command = new SlashCommand()
         try {
             // 檢查用戶是否在語音頻道
             const member = interaction.member;
-            if (!member.voice.channel) {
-                return interaction.reply({
+            if (!member.voice.channel) {                return interaction.reply({
                     embeds: [
                         new EmbedBuilder()
                             .setColor("#FF0000")
@@ -18,14 +17,13 @@ const command = new SlashCommand()
                             .setDescription("您需要在語音頻道中才能使用此指令")
                             .setTimestamp()
                     ],
-                    ephemeral: true
+                    flags: 1 << 6 // Discord.MessageFlags.Ephemeral
                 });
             }
 
             // 獲取播放佇列
             const queue = client.player.nodes.get(interaction.guild);
-            if (!queue || !queue.currentTrack) {
-                return interaction.reply({
+            if (!queue || !queue.currentTrack) {                return interaction.reply({
                     embeds: [
                         new EmbedBuilder()
                             .setColor("#FF0000")
@@ -33,11 +31,11 @@ const command = new SlashCommand()
                             .setDescription("目前沒有正在播放的內容")
                             .setTimestamp()
                     ],
-                    ephemeral: true
+                    flags: 1 << 6 // Discord.MessageFlags.Ephemeral
                 });
             }
 
-            await interaction.deferReply();
+            // 移除手動 deferReply，因為已設置 setSelfDefer(true)
 
             // 檢查機器人是否與用戶在同一個語音頻道
             const botVoiceChannel = queue.connection?.channel;
@@ -114,12 +112,10 @@ const command = new SlashCommand()
                         .setDescription("停止播放時發生錯誤，請稍後再試")
                         .setTimestamp()
                 ]
-            };
-
-            if (interaction.deferred) {
+            };            if (interaction.deferred) {
                 return interaction.editReply(errorResponse);
             } else {
-                return interaction.reply({ ...errorResponse, ephemeral: true });
+                return interaction.reply({ ...errorResponse, flags: 1 << 6 });
             }
         }
     });

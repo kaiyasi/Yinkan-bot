@@ -4,6 +4,7 @@ const { EmbedBuilder } = require("discord.js");
 const command = new SlashCommand()
   .setName("resume")
   .setDescription("繼續播放目前暫停的音樂")
+  .setSelfDefer(true)
   .setRun(async (client, interaction, options) => {
     try {
       const queue = client.player.nodes.get(interaction.guild);

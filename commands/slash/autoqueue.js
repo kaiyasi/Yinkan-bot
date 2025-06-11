@@ -5,6 +5,7 @@ const SlashCommand = require("../../lib/SlashCommand");
 const command = new SlashCommand()
     .setName("autoqueue")
     .setDescription("設置自動佇列模式，當佇列播放完畢時自動添加相關歌曲")
+    .setSelfDefer(true)
     .setRun(async (client, interaction) => {
         let channel = await client.getChannel(client, interaction);
         if (!channel) {

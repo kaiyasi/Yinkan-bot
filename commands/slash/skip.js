@@ -9,8 +9,7 @@ const command = new SlashCommand()
         try {
             // 檢查用戶是否在語音頻道
             const voiceChannel = interaction.member.voice.channel;
-            if (!voiceChannel) {
-                return interaction.reply({
+            if (!voiceChannel) {                return interaction.reply({
                     embeds: [
                         new EmbedBuilder()
                             .setColor("#FF0000")
@@ -18,13 +17,12 @@ const command = new SlashCommand()
                             .setDescription("您需要在語音頻道中才能使用此指令")
                             .setTimestamp()
                     ],
-                    ephemeral: true
+                    flags: 1 << 6 // Discord.MessageFlags.Ephemeral
                 });
             }
 
             // 檢查播放器是否可用
-            if (!client.player) {
-                return interaction.reply({
+            if (!client.player) {                return interaction.reply({
                     embeds: [
                         new EmbedBuilder()
                             .setColor("#FF0000")
@@ -32,11 +30,11 @@ const command = new SlashCommand()
                             .setDescription("Discord Player 尚未開始")
                             .setTimestamp()
                     ],
-                    ephemeral: true
+                    flags: 1 << 6 // Discord.MessageFlags.Ephemeral
                 });
             }
 
-            await interaction.deferReply();
+            // 移除手動 deferReply，因為已設置 setSelfDefer(true)
 
             // 獲取播放佇列
             const queue = client.player.nodes.get(interaction.guild.id);
@@ -162,12 +160,10 @@ const command = new SlashCommand()
                         .setDescription("執行跳過時發生錯誤，請稍後再試")
                         .setTimestamp()
                 ]
-            };
-
-            if (interaction.deferred) {
+            };            if (interaction.deferred) {
                 return interaction.editReply(errorResponse);
             } else {
-                return interaction.reply({ ...errorResponse, ephemeral: true });
+                return interaction.reply({ ...errorResponse, flags: 1 << 6 });
             }
         }
     });

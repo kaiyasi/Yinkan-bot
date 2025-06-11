@@ -4,6 +4,7 @@ const { EmbedBuilder } = require("discord.js");
 const command = new SlashCommand()
   .setName("ping")
   .setDescription("顯示機器人的延遲資訊")
+  .setSelfDefer(true)
   .setRun(async (client, interaction) => {
     try {
       // 先回應一個檢查中的訊息

@@ -14,6 +14,7 @@ let prettyMs;
 const command = new SlashCommand()
   .setName("save")
   .setDescription("將當前播放的歌曲保存到你的私人訊息")
+  .setSelfDefer(true)
   .setRun(async (client, interaction) => {
     try {
       // 獲取播放器

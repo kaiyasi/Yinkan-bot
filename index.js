@@ -2,6 +2,7 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, Collection, EmbedBuilder } = require('discord.js');
 const { Player } = require('discord-player');
 const { DefaultExtractors } = require('@discord-player/extractor'); // 新增這行
+const { YoutubeiExtractor } = require('discord-player-youtubei'); // 添加 YouTubei 提取器
 const path = require('path');
 
 // 處理未捕捉的 Promise 拒絕
@@ -11,6 +12,18 @@ process.on('unhandledRejection', (error) => {
     // 如果是 play-dl 的 Invalid URL 錯誤，記錄但不終止程序
     if (error.code === 'ERR_INVALID_URL' && error.input === 'undefined') {
         console.log('⚠️ 檢測到 play-dl URL 錯誤，這通常是暫時性的串流問題');
+        return;
+    }
+    
+    // 如果是 YouTubei 的格式錯誤，記錄但不終止程序
+    if (error.message && error.message.includes('No matching formats found')) {
+        console.log('⚠️ 檢測到 YouTubei 格式錯誤，將嘗試備用搜索方法');
+        return;
+    }
+    
+    // 如果是 InnertubeError，記錄但不終止程序
+    if (error.constructor.name === 'InnertubeError') {
+        console.log('⚠️ 檢測到 YouTube 內部錯誤，這通常是暫時性問題');
         return;
     }
 });
@@ -230,27 +243,43 @@ class MusicBot extends Client {
         } catch (error) {
             console.error('更新控制面板失敗:', error);
         }
-    }
-
-    // 修改 setupExtractors 方法使用新的 API
+    }    // 修改 setupExtractors 方法使用新的 API
     async setupExtractors() {
         try {
-            // 使用新的 loadMulti API 載入預設提取器
-            console.log('⚙️ 載入預設音樂提取器...');
-            await this.player.extractors.loadMulti(DefaultExtractors);
+            // 首先註冊 YouTubei 提取器（專門用於 YouTube）- 使用更寬鬆的配置
+            console.log('⚙️ 載入 YouTubei 提取器...');
+            await this.player.extractors.register(YoutubeiExtractor, {
+                authentication: process.env.YT_COOKIE || '', // 可選的 YouTube Cookie
+                streamOptions: {
+                    quality: 'high', // 改為 high 而不是 best
+                    format: 'any', // 接受任何格式
+                    type: 'audio', // 只需要音頻
+                    highWaterMark: 1 << 25,
+                    downloadOptions: {
+                        quality: 'high',
+                        format: 'any'
+                    }
+                }
+            });
+            console.log('✅ 已註冊 YouTubei 提取器');
             
-            // 註冊增強型提取器 (如果存在)
+            // 然後載入其他預設提取器
+            console.log('⚙️ 載入其他預設音樂提取器...');
+            await this.player.extractors.loadMulti(DefaultExtractors);
+            console.log('✅ 已載入預設提取器');
+            
+            // 最後註冊增強型提取器作為備用 (如果存在)
             if (this.enhancedExtractor) {
                 try {
                     // 建立提取器實例
                     const customExtractor = new this.enhancedExtractor();
                     // 註冊到播放器
                     await this.player.extractors.register(customExtractor);
-                    console.log('✅ 已註冊增強型 YouTube 提取器');
+                    console.log('✅ 已註冊增強型 YouTube 提取器作為備用');
                 } catch (error) {
                     console.error('❌ 註冊增強型提取器失敗:', error.message);
-                }
-            }
+                    console.log('⚠️ 將繼續使用預設提取器');
+                }            }
             
             // 顯示已載入的 extractors
             const extractors = this.player.extractors.store.map(ext => ext.identifier || 'unknown');

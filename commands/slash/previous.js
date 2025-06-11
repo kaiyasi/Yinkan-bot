@@ -4,6 +4,7 @@ const { EmbedBuilder } = require("discord.js");
 const command = new SlashCommand()
   .setName("previous")
   .setDescription("返回播放上一首歌曲")
+  .setSelfDefer(true)
   .setRun(async (client, interaction) => {
     try {
       // 檢查用戶是否在語音頻道

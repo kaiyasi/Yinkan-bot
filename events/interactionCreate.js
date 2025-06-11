@@ -81,6 +81,13 @@ module.exports = {
                 }
 
                 try {
+                    // 檢查互動是否已過期（Discord 互動有 15 分鐘限制）
+                    const interactionAge = Date.now() - interaction.createdTimestamp;
+                    if (interactionAge > 14 * 60 * 1000) { // 14分鐘作為安全邊界
+                        console.log(`互動已接近過期時間，跳過指令執行: ${interaction.commandName}`);
+                        return;
+                    }
+                    
                     // 立即使用 deferReply 避免超時問題
                     // 除非命令明確提到不需要延遲回應 (noDefer=true)
                     // 或命令會自行處理回應 (selfDefer=true)
@@ -94,21 +101,46 @@ module.exports = {
                             if (deferError.code !== 10062) { // 10062 為互動已過期錯誤碼
                                 console.error('延遲回應失敗:', deferError);
                             }
+                            return; // 如果延遲回應失敗，直接返回
                         }
                     }
                     
-                    // 執行命令
-                    await command.execute(interaction, client);
+                    // 設置命令執行超時
+                    const COMMAND_TIMEOUT = 12 * 60 * 1000; // 12分鐘超時限制
+                    
+                    // 執行命令，帶有超時控制
+                    await Promise.race([
+                        command.execute(interaction, client),
+                        new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error('指令執行超時')), COMMAND_TIMEOUT)
+                        )
+                    ]);
                 } catch (error) {
                     console.error('執行指令時發生錯誤:', error);
                     
                     // 處理錯誤回應，更安全地處理互動狀態
                     try {
-                        const errorEmbed = client.ErrorEmbed("執行指令時發生錯誤", "執行錯誤");
+                        // 檢查是否為超時錯誤
+                        if (error.message === '指令執行超時') {
+                            console.log(`指令 ${interaction.commandName} 執行超時`);
+                            return; // 超時情況下不嘗試回應，避免進一步錯誤
+                        }
                         
-                        if (error.code === 10062) {
-                            // 互動已過期，記錄但不執行任何操作
-                            console.log('互動已過期，無法回應');
+                        const errorEmbed = client.ErrorEmbed(
+                            error.message || "執行指令時發生錯誤", 
+                            "執行錯誤"
+                        );
+                        
+                        if (error.code === 10062 || error.code === 'InteractionAlreadyReplied') {
+                            // 互動已過期或已回應，記錄但不執行任何操作
+                            console.log('互動已過期或已回應，無法再次回應');
+                            return;
+                        }
+                        
+                        // 檢查互動年齡
+                        const interactionAge = Date.now() - interaction.createdTimestamp;
+                        if (interactionAge > 14 * 60 * 1000) {
+                            console.log('互動接近過期，跳過錯誤回應');
                             return;
                         }
                         
@@ -119,6 +151,10 @@ module.exports = {
                         }
                     } catch (followUpError) {
                         console.error('回應錯誤失敗:', followUpError);
+                        // 如果是互動相關錯誤，忽略
+                        if (followUpError.code === 10062 || followUpError.code === 'InteractionAlreadyReplied') {
+                            console.log('無法回應錯誤：互動已過期或已回應');
+                        }
                     }
                 }
             }
