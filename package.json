@@ -1,35 +1,47 @@
 {
-  "name": "yinkan-bot",
-  "version": "2.1.0",
-  "private": true,
-  "description": "A feature-rich Discord music bot using discord.js v14 and discord-player v6.",
+  "name": "discord-musicbot",
+  "version": "5.1.0",
+  "description": "Advanced Discord music bot with interactive interface and enhanced features",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "package": "node scripts/package.js"
-  },
-  "dependencies": {
-    "@discord-player/extractor": "^4.4.7",
-    "@discordjs/voice": "^0.17.0",
-    "colors": "^1.4.0",
-    "discord-player": "^6.6.10",
-    "discord-player-youtubei": "^1.1.10",
-    "discord.js": "^14.15.3",
-    "dotenv": "^16.4.5",
-    "ffmpeg-static": "^5.2.0",
-    "moment": "^2.30.1",
-    "node-fetch": "^3.3.2",
-    "opusscript": "^0.0.8",
-    "play-dl": "^1.9.7",
-    "pretty-ms": "^8.0.0",
-    "prism-media": "^1.3.5",
-    "tweetnacl": "^1.0.3",
-    "youtube-sr": "^4.3.11"
-  },
-  "devDependencies": {
-    "archiver": "^7.0.1"
+    "dev": "nodemon index.js",
+    "deploy": "node deploy/deployGlobal",
+    "guild": "node deploy/deployGuild"
   },
   "engines": {
-    "node": ">=16.9.0"
+    "node": ">=16.x"
+  },
+  "overrides": {
+    "opusscript": "$@discordjs/opus"
+  },
+  "dependencies": {
+    "@discord-player/extractor": "^7.1.0",
+    "@discordjs/builders": "^1.11.2",
+    "@discordjs/opus": "^0.10.0",
+    "@discordjs/rest": "^2.5.0",
+    "@discordjs/voice": "^0.16.1",
+    "@distube/ytdl-core": "^4.16.10",
+    "colors": "^1.4.0",
+    "discord-player": "^7.1.0",
+    "discord-player-youtubei": "^1.4.6",
+    "discord.js": "^14.19.3",
+    "dotenv": "^16.5.0",
+    "express": "^4.18.2",
+    "express-session": "^1.18.1",
+    "ffmpeg-static": "^5.2.0",
+    "jsoning": "^1.0.1",
+    "lyrics-finder": "^21.7.0",
+    "moment": "^2.30.1",
+    "moment-duration-format": "^2.3.2",
+    "passport": "^0.7.0",
+    "passport-discord": "^0.1.4",
+    "pretty-ms": "^8.0.0",
+    "prism-media": "^1.3.5",
+    "undici": "^5.28.2",
+    "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.1.0"
   }
 }
