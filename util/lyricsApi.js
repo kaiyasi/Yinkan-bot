@@ -2,48 +2,42 @@ const lyricsFinder = require('lyrics-finder');
 
 let fetch;
 (async () => {
-    fetch = (await import('node-fetch')).default;
+    try {
+        fetch = (await import('node-fetch')).default;
+    } catch (e) {
+        console.error("node-fetch is required for the lyrics command. Please install it.");
+    }
 })();
 
 async function searchLyrics(query) {
-  try {
-    console.log(`🔍 搜尋歌詞: ${query}`);
-    
-    // 使用 lyrics-finder 來搜尋歌詞
-    const lyrics = await lyricsFinder(query);
-    
-    if (lyrics) {
-      // 清理歌曲名稱，移除常見的標籤
-      const cleanTitle = query
-        .replace(/\[.*?\]/g, '') // 移除 [...]
-        .replace(/\(.*?\)/g, '') // 移除 (...)
-        .replace(/【.*?】/g, '') // 移除 【...】
-        .replace(/official|video|mv|lyric|audio/gi, '') // 移除常見標籤
-        .trim();
-      
-      return {
-        title: cleanTitle || query,
-        artist: "未知歌手",
-        lyrics: lyrics
-      };
+    if (!fetch) {
+        console.error("node-fetch is not available.");
+        return null;
     }
-    
-    // 如果找不到歌詞，返回友好的訊息
-    return {
-      title: query,
-      artist: "未知歌手",
-      lyrics: `抱歉，找不到 "${query}" 的歌詞。\n\n可能的原因：\n• 歌曲名稱拼寫錯誤\n• 歌曲太新或太冷門\n• 歌詞資料庫中沒有此歌曲\n\n建議：\n• 嘗試使用更簡潔的歌曲名稱\n• 包含歌手名稱，例如："歌手名 - 歌曲名"`
-    };
+    try {
+        const response = await fetch(`https://some-random-api.com/lyrics?title=${encodeURIComponent(query)}`);
+        if (!response.ok) {
+            console.error(`Lyrics API error: ${response.status} ${response.statusText}`);
+            return null;
+        }
+        const data = await response.json();
 
-  } catch (error) {
-    console.error("搜尋歌詞錯誤:", error);
-    
-    return {
-      title: query,
-      artist: "搜尋失敗",
-      lyrics: `搜尋歌詞時發生錯誤：${error.message}\n\n請稍後再試，或手動搜尋歌詞。`
-    };
-  }
+        if (data.error) {
+            console.log(`Lyrics not found for: ${query}`);
+            return null;
+        }
+
+        return {
+            title: data.title,
+            artist: data.author,
+            lyrics: data.lyrics,
+            thumbnail: data.thumbnail?.genius,
+            url: data.links?.genius,
+        };
+    } catch (error) {
+        console.error("Error fetching lyrics:", error);
+        return null;
+    }
 }
 
 async function search(query) {

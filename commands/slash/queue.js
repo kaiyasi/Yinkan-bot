@@ -85,21 +85,54 @@ const command = new SlashCommand()
             value: `[${currentTrack.title}](${currentTrack.url})\n👤 ${currentTrack.requestedBy?.toString() || "未知"}`,
             inline: false
           }
-        ]);
-
-      // 顯示接下來的 10 首歌曲
+        ]);      // 顯示接下來的 10 首歌曲，但要注意字符限制
       const displayTracks = tracks.slice(0, 10);
-      const queueList = displayTracks.map((track, i) => 
-        `\`${i + 1}.\` [${track.title}](${track.url})\n👤 ${track.requestedBy?.toString() || "未知"}`
-      ).join('\n\n');
+      
+      // 為了避免超過 Discord 1024 字符限制，我們需要縮短歌曲標題
+      const shortenTitle = (title, maxLength = 60) => {
+        return title.length > maxLength ? title.substring(0, maxLength) + '...' : title;
+      };
+      
+      const queueList = displayTracks.map((track, i) => {
+        const shortTitle = shortenTitle(track.title);
+        return `\`${i + 1}.\` [${shortTitle}](${track.url})\n👤 ${track.requestedBy?.toString() || "未知"}`;
+      }).join('\n\n');
 
-      queueEmbed.addFields([
-        {
-          name: "📋 接下來播放",
-          value: queueList || "佇列為空",
-          inline: false
-        }
-      ]);
+      // 檢查內容長度，如果仍然太長則進一步分割
+      if (queueList.length <= 1024) {
+        queueEmbed.addFields([
+          {
+            name: "📋 接下來播放",
+            value: queueList || "佇列為空",
+            inline: false
+          }
+        ]);
+      } else {
+        // 如果內容仍然太長，分成兩個字段
+        const midpoint = Math.ceil(displayTracks.length / 2);
+        const firstHalf = displayTracks.slice(0, midpoint).map((track, i) => {
+          const shortTitle = shortenTitle(track.title);
+          return `\`${i + 1}.\` [${shortTitle}](${track.url})\n👤 ${track.requestedBy?.toString() || "未知"}`;
+        }).join('\n\n');
+        
+        const secondHalf = displayTracks.slice(midpoint).map((track, i) => {
+          const shortTitle = shortenTitle(track.title);
+          return `\`${midpoint + i + 1}.\` [${shortTitle}](${track.url})\n👤 ${track.requestedBy?.toString() || "未知"}`;
+        }).join('\n\n');
+
+        queueEmbed.addFields([
+          {
+            name: "📋 接下來播放 (1-" + midpoint + ")",
+            value: firstHalf,
+            inline: false
+          },
+          {
+            name: "📋 接下來播放 (" + (midpoint + 1) + "-" + displayTracks.length + ")",
+            value: secondHalf,
+            inline: false
+          }
+        ]);
+      }
 
       // 如果還有更多歌曲
       if (tracks.length > 10) {

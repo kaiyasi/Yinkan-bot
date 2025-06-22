@@ -26,6 +26,11 @@ process.on('unhandledRejection', (error) => {
         console.log('⚠️ 檢測到 YouTube 內部錯誤，這通常是暫時性問題');
         return;
     }
+
+    if (error.message && error.message.includes('CompositeVideoPrimaryInfo not found')) {
+        console.log('⚠️ 檢測到 YouTube 解析器錯誤，建議更新 youtubei.js 或報告問題。');
+        return;
+    }
 });
 
 // 處理未捕捉的例外
@@ -262,10 +267,9 @@ class MusicBot extends Client {
                 }
             });
             console.log('✅ 已註冊 YouTubei 提取器');
-            
-            // 然後載入其他預設提取器
+              // 然後載入其他預設提取器
             console.log('⚙️ 載入其他預設音樂提取器...');
-            await this.player.extractors.loadMulti(DefaultExtractors);
+            await this.player.extractors.loadDefault();
             console.log('✅ 已載入預設提取器');
             
             // 最後註冊增強型提取器作為備用 (如果存在)
@@ -341,9 +345,7 @@ class MusicBot extends Client {
                     console.error('發送控制面板錯誤:', error);
                 }
             }
-        });
-
-        this.player.events.on('audioTrackAdd', (queue, track) => {
+        });        this.player.events.on('audioTrackAdd', (queue, track) => {
             console.log(`➕ 添加到佇列: ${track.title}`);
             
             if (queue?.metadata?.channel?.send) {
@@ -360,6 +362,55 @@ class MusicBot extends Client {
                 queue.metadata.channel.send({ embeds: [addedEmbed] })
                     .then(msg => setTimeout(() => msg.delete().catch(() => {}), 5000))
                     .catch(console.error);
+            }
+        });        // 播放清單處理事件
+        this.player.events.on('audioTracksAdd', (queue, tracks) => {
+            console.log(`📃 播放清單已添加: ${tracks.length} 首歌曲`);
+            
+            if (queue?.metadata?.channel?.send) {
+                const playlistEmbed = this.SuccessEmbed(
+                    `已成功添加 **${tracks.length}** 首歌曲到播放佇列\n👤 請求者: ${tracks[0]?.requestedBy?.toString() || '未知'}`, 
+                    "播放清單已添加"
+                );
+                
+                // 顯示前幾首歌曲，但要控制字符長度
+                if (tracks.length > 0) {
+                    const shortenTitle = (title, maxLength = 50) => {
+                        return title.length > maxLength ? title.substring(0, maxLength) + '...' : title;
+                    };
+                    
+                    const trackList = tracks.slice(0, 3).map((track, index) => 
+                        `${index + 1}. **${shortenTitle(track.title)}** (${track.duration || '直播'})`
+                    ).join('\n');
+                    
+                    const fieldValue = trackList + (tracks.length > 3 ? `\n...以及其他 ${tracks.length - 3} 首歌曲` : '');
+                    
+                    // 確保字段值不超過 1024 字符
+                    if (fieldValue.length <= 1024) {
+                        playlistEmbed.addFields([
+                            { 
+                                name: '🎵 歌曲預覽', 
+                                value: fieldValue, 
+                                inline: false 
+                            }
+                        ]);
+                    } else {
+                        // 如果仍然太長，只顯示統計信息
+                        playlistEmbed.addFields([
+                            { 
+                                name: '🎵 播放清單統計', 
+                                value: `共 ${tracks.length} 首歌曲已添加到佇列\n使用 \`/queue\` 指令查看完整清單`, 
+                                inline: false 
+                            }
+                        ]);
+                    }
+                    
+                    if (tracks[0].thumbnail) {
+                        playlistEmbed.setThumbnail(tracks[0].thumbnail);
+                    }
+                }
+                
+                queue.metadata.channel.send({ embeds: [playlistEmbed] }).catch(console.error);
             }
         });
 
@@ -405,13 +456,16 @@ class MusicBot extends Client {
             }
         });
 
-        this.player.events.on('playerSkip', (queue, track) => {
+        this.player.events.on('playerSkip', async (queue, track) => {
             console.log(`⏭️ 跳過歌曲: ${track.title}`);
             if (queue?.metadata?.channel?.send) {
                 const skipEmbed = this.WarningEmbed(`已跳過: **${track.title}**`, "跳過歌曲");
-                queue.metadata.channel.send({ embeds: [skipEmbed] })
-                    .then(msg => setTimeout(() => msg.delete().catch(() => {}), 3000))
-                    .catch(console.error);
+                try {
+                    const message = await queue.metadata.channel.send({ embeds: [skipEmbed] });
+                    setTimeout(() => message.delete().catch(() => {}), 3000);
+                } catch (error) {
+                    console.error('發送跳過訊息時發生錯誤:', error);
+                }
             }
         });
 
@@ -443,6 +497,26 @@ class MusicBot extends Client {
         // 添加調試事件
         this.player.events.on('debug', (queue, message) => {
             console.log(`[DEBUG] ${message}`);
+        });
+
+        // 添加互動過期檢查和錯誤處理
+        this.player.events.on('interactionError', async (interaction, error) => {
+            if (error.code === 10062) {
+                console.warn('⚠️ 互動已過期，無法回應。');
+                return;
+            }
+
+            console.error('互動錯誤:', error);
+
+            try {
+                if (interaction.replied || interaction.deferred) {
+                    console.warn('⚠️ 嘗試回應已處理的互動，操作已跳過。');
+                } else {
+                    await interaction.deferUpdate(); // 延長互動有效時間
+                }
+            } catch (replyError) {
+                console.error('延長互動有效時間時發生錯誤:', replyError);
+            }
         });
     }
 
@@ -566,6 +640,9 @@ client.init().catch(error => {
 
 console.log("Make sure to fill in the config.js before starting the bot.");
 
+module.exports = {
+    getClient: () => client,
+};
 module.exports = {
     getClient: () => client,
 };

@@ -56,53 +56,62 @@ const command = new SlashCommand()
           ],
           flags: 1 << 6 // Discord.MessageFlags.Ephemeral
         });
-      }      // 處理 YouTube URL，但優先使用搜索而不是直接 URL
+      }      // 處理 YouTube URL，保留播放清單參數
       let finalSong = song;
       let useYouTubeExtractor = false;
+      let playlistMatch = null;
 
-      // 檢查是否為 YouTube URL（支援多種格式）
+      // 檢查是否為 YouTube URL（支援多種格式，包括播放清單）
       const youtubeRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+      const playlistRegex = /[&?]list=([^&]+)/;
       const youtubeMatch = song.match(youtubeRegex);
+      playlistMatch = song.match(playlistRegex);
       
       if (youtubeMatch && youtubeMatch[1]) {
         useYouTubeExtractor = true;
         const videoId = youtubeMatch[1];
         
-        // 對於 YouTube URL，嘗試提取歌曲標題關鍵字而不是直接使用 URL
-        if (song.includes('風箏')) {
-          finalSong = '風箏 2012 2022 跨十年 合唱版';
-          console.log(`YouTube URL 轉換為搜索詞: ${song} -> ${finalSong}`);
+        // 如果有播放清單參數，直接使用原始 URL（包含播放清單）
+        if (playlistMatch && playlistMatch[1]) {
+          finalSong = song; // 保持原始 URL 以保留播放清單
+          console.log(`檢測到 YouTube 播放清單: ${song}`);
         } else {
-          // 嘗試從 URL 解碼標題信息
-          try {
-            const decodedUrl = decodeURIComponent(song);
-            // 查找可能的歌曲標題
-            const titleMatch = decodedUrl.match(/[&?](?:title|t)=([^&]+)/i);
-            if (titleMatch && titleMatch[1]) {
-              finalSong = titleMatch[1].replace(/[+_]/g, ' ').trim();
-              console.log(`從 URL 提取標題: ${finalSong}`);
-            } else {
-              // 如果無法提取標題，使用通用搜索
-              finalSong = 'popular music 2022';
-              console.log(`無法提取標題，使用通用搜索: ${finalSong}`);
+          // 對於單個影片，嘗試提取歌曲標題關鍵字而不是直接使用 URL
+          if (song.includes('風箏')) {
+            finalSong = '風箏 2012 2022 跨十年 合唱版';
+            console.log(`YouTube URL 轉換為搜索詞: ${song} -> ${finalSong}`);
+          } else {
+            // 嘗試從 URL 解碼標題信息
+            try {
+              const decodedUrl = decodeURIComponent(song);
+              // 查找可能的歌曲標題
+              const titleMatch = decodedUrl.match(/[&?](?:title|t)=([^&]+)/i);
+              if (titleMatch && titleMatch[1]) {
+                finalSong = titleMatch[1].replace(/[+_]/g, ' ').trim();
+                console.log(`從 URL 提取標題: ${finalSong}`);
+              } else {
+                // 如果無法提取標題，使用通用搜索
+                finalSong = 'popular music 2022';
+                console.log(`無法提取標題，使用通用搜索: ${finalSong}`);
+              }
+            } catch (decodeError) {
+              finalSong = 'music';
+              console.log(`URL 解碼失敗，使用基本搜索: ${finalSong}`);
             }
-          } catch (decodeError) {
-            finalSong = 'music';
-            console.log(`URL 解碼失敗，使用基本搜索: ${finalSong}`);
           }
         }
       } else if (song.includes('youtube.com') || song.includes('youtu.be')) {
         // 如果看起來像 YouTube URL 但無法提取 ID，記錄並繼續處理
         console.log(`檢測到疑似 YouTube URL 但無法提取視頻 ID: ${song}`);
         useYouTubeExtractor = true; // 仍然嘗試 YouTube 特定處理
-        finalSong = 'music'; // 使用通用搜索詞
+        finalSong = song; // 保持原始 URL
+        playlistMatch = song.match(playlistRegex); // 重新檢查播放清單
       }
 
       console.log(`播放: ${finalSong} (使用 YouTube 搜索器: ${useYouTubeExtractor})`);
 
       let playResult;
-      
-      // 設置最大重試次數和超時限制
+        // 設置最大重試次數和超時限制
       const MAX_RETRIES = 1; // 只允許1次重試以防止互動超時
       const RETRY_TIMEOUT = 10000; // 10秒超時限制（Discord 互動有 15 分鐘限制）
       let retryCount = 0;
@@ -115,7 +124,9 @@ const command = new SlashCommand()
             setTimeout(() => reject(new Error('播放請求超時')), RETRY_TIMEOUT)
           )
         ]);
-      };      // 嘗試播放歌曲 - 優先使用搜索而不是直接 URL
+      };
+      
+      // 嘗試播放歌曲 - 優先使用搜索而不是直接 URL
       try {
         console.log(`開始搜索: "${finalSong}"`);
         
@@ -126,9 +137,16 @@ const command = new SlashCommand()
             leaveOnEnd: client.config.autoLeave,
             volume: client.config.defaultVolume
           },
-          // 不指定搜索引擎，讓 discord-player 自動選擇最佳的
+          // 針對播放清單的特殊處理
+          requestedBy: interaction.user,
+          // 如果包含播放清單，允許批量添加
+          ...(playlistMatch ? { 
+            playlist: true,
+            maxPlaylistSize: 50 // 限制播放清單大小
+          } : {}),          // 不指定搜索引擎，讓 discord-player 自動選擇最佳的
           searchEngine: undefined
-        });} catch (urlError) {
+        });
+      } catch (urlError) {
         // 如果初始搜索失敗，嘗試不同的搜索策略
         if (retryCount < MAX_RETRIES && 
             (urlError.code === 'ERR_NO_RESULT' || 

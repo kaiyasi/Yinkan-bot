@@ -1,39 +1,41 @@
 {
-  "name": "Discord-MusicBot",
-  "description": "Very simple discord music bot with the discord.js with Song Name playing. It can able to play music with the song name",
+  "name": "Yinkan-MusicBot",
+  "description": "A feature-rich Discord music bot using discord.js v14 and discord-player v6, with dynamic voice channels and more.",
   "repository": "https://github.com/SudhanPlayz/Discord-MusicBot",
   "logo": "https://cdn.discordapp.com/avatars/750613142488481843/e6326038dbe2243ca551ba5b6ecd8bf2.png?size=1024",
   "keywords": [
     "node",
     "discord",
-    "youtube",
+    "discord.js",
     "music",
     "bot",
-    "lavalink",
-    "dashboard"
+    "discord-player"
   ],
   "image": "heroku/nodejs",
   "buildpacks": [
     {
       "url": "heroku/nodejs"
+    },
+    {
+      "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
     }
   ],
   "env": {
-    "token": {
-      "description": "The Discord Bot Token (https://discord.com/developers/applications)",
-      "required": "true"
+    "TOKEN": {
+      "description": "Your Discord Bot Token from the Discord Developer Portal.",
+      "required": true
     },
-    "clientId": {
-      "description": "The Discord Bot ClientID",
-      "required": "true"
+    "CLIENT_ID": {
+      "description": "The Client ID of your Discord Bot Application.",
+      "required": true
     },
-    "clientSecret": {
-      "description": "The Discord Bot ClientSecret",
-      "required": "true"
+    "ADMIN_ID": {
+      "description": "The Discord User ID of the bot administrator for admin commands.",
+      "required": true
     },
-    "website": {
-      "description": "URL of your webserver (Example: https://domain.xyz). Change this if you want to use the web-dashboard.",
-      "value": "http://localhost"
+    "YT_COOKIE": {
+      "description": "(Optional) Your YouTube cookie to bypass certain playback restrictions.",
+      "required": false
     }
   }
 }
