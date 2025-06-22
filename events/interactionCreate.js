@@ -1,5 +1,4 @@
 const { EmbedBuilder } = require('discord.js');
-const lyricsFinder = require('lyrics-finder');
 const Controller = require("../util/Controller");
 const yt = require("youtube-sr").default;
 
@@ -603,3 +602,4 @@ async function handleAutocomplete(interaction) {
     }
   }
 }
+

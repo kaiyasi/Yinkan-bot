@@ -1,148 +1,132 @@
-const SlashCommand = require("../../lib/SlashCommand");
+// 這個檔案是用來處理 Discord Slash Command 的播放清單功能
+
+const { QueryType } = require("discord-player");
 const { EmbedBuilder } = require("discord.js");
+const path = require("path");
+
+// 為了方便管理，我們假設您有一個指令的基底類別
+// 如果沒有，您可以直接導出一個物件
+// 這邊為了符合您的原始碼結構，我們就地建立一個模擬的 SlashCommand
+class SlashCommand {
+    constructor() {
+        this.data = {
+            name: '',
+            description: '',
+            options: [],
+        };
+        this._run = async () => {};
+    }
+    setName(name) {
+        this.data.name = name;
+        return this;
+    }
+    setDescription(description) {
+        this.data.description = description;
+        return this;
+    }
+    addStringOption(option) {
+        // 這是一個簡化的實作，實際上 discord.js 的 option builder 更複雜
+        this.data.options.push(option({
+            setName: (name) => ({
+                setDescription: (desc) => ({
+                    setRequired: (req) => ({ name, description: desc, required: req, type: 'string' })
+                })
+            })
+        }));
+        return this;
+    }
+    setRun(fn) {
+        this._run = fn;
+        return this;
+    }
+    // 添加一個執行方法，讓主文件可以呼叫
+    get run() {
+        return this._run;
+    }
+    // 添加一個 name getter，讓主文件可以讀取
+    get name() {
+        return this.data.name;
+    }
+}
+
 
 const command = new SlashCommand()
-  .setName("playlist")
-  .setDescription("播放 YouTube 播放清單")
-  .addStringOption((option) =>
-    option
-      .setName("url")
-      .setDescription("YouTube 播放清單 URL")
-      .setRequired(true)
-  )
-  .addIntegerOption((option) =>
-    option
-      .setName("limit")
-      .setDescription("限制播放清單中的歌曲數量 (預設: 50, 最大: 100)")
-      .setMinValue(1)
-      .setMaxValue(100)
-      .setRequired(false)
-  )
-  .setSelfDefer(true)
-  .setRun(async (client, interaction, options) => {
-    try {
-      // 檢查用戶是否在語音頻道
-      const voiceChannel = interaction.member.voice.channel;
-      if (!voiceChannel) {
-        return interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor("#FF0000")
-              .setTitle("❌ 你必須在語音頻道中才能使用此指令")
-              .setDescription("請先加入一個語音頻道")
-              .setTimestamp()
-          ],
-          flags: 1 << 6 // Discord.MessageFlags.Ephemeral
-        });
-      }
-
-      // 檢查機器人是否有必要的權限
-      const permissions = voiceChannel.permissionsFor(client.user);
-      if (!permissions.has("Connect") || !permissions.has("Speak")) {
-        return interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor("#FF0000")
-              .setTitle("❌ 權限不足")
-              .setDescription("機器人需要連接和說話權限")
-              .setTimestamp()
-          ],
-          flags: 1 << 6 // Discord.MessageFlags.Ephemeral
-        });
-      }
-
-      const playlistUrl = options.getString("url", true);
-      const limit = options.getInteger("limit") || 50;
-
-      // 驗證是否為有效的 YouTube 播放清單 URL
-      const playlistRegex = /[&?]list=([^&]+)/;
-      const playlistMatch = playlistUrl.match(playlistRegex);
-      
-      if (!playlistMatch || !playlistUrl.includes('youtube.com')) {
-        return interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor("#FF0000")
-              .setTitle("❌ 無效的播放清單 URL")
-              .setDescription("請提供有效的 YouTube 播放清單 URL\n\n**範例：**\n`https://www.youtube.com/playlist?list=PLxxxxxxx`")
-              .setTimestamp()
-          ],
-          flags: 1 << 6 // Discord.MessageFlags.Ephemeral
-        });
-      }
-
-      console.log(`🎵 播放清單請求: ${playlistUrl} (限制: ${limit} 首)`);
-
-      // 播放播放清單
-      try {
-        const playResult = await client.player.play(voiceChannel, playlistUrl, {
-          nodeOptions: {
-            metadata: interaction,
-            leaveOnEmpty: client.config.autoLeave,
-            leaveOnEnd: client.config.autoLeave,
-            volume: client.config.defaultVolume
-          },
-          requestedBy: interaction.user,
-          playlist: true,
-          maxPlaylistSize: limit,
-          searchEngine: undefined // 讓 discord-player 自動選擇最佳的
-        });
-
-        // 如果播放成功，回應訊息將由事件處理器自動發送
-        console.log(`✅ 播放清單播放請求已提交`);
-
-      } catch (error) {
-        console.error(`播放清單播放錯誤:`, error);
-        
-        let errorMessage = "播放清單播放失敗";
-        
-        if (error.message.includes('No results') || error.code === 'ERR_NO_RESULT') {
-          errorMessage = "找不到播放清單或播放清單為空\n• 請確認播放清單 URL 是否正確\n• 確認播放清單是否為公開狀態\n• 播放清單可能被移除或設為私人";
-        } else if (error.message.includes('timeout') || error.message.includes('超時')) {
-          errorMessage = "播放清單載入超時\n• 播放清單可能太大\n• 請嘗試減少歌曲數量限制\n• 檢查網路連線是否正常";
-        } else if (error.message.includes('region') || error.message.includes('地區')) {
-          errorMessage = "播放清單包含地區限制的內容\n• 某些歌曲可能在你的地區無法播放\n• 嘗試使用 VPN 或尋找替代版本";
-        } else {
-          errorMessage = `播放失敗: ${error.message}`;
+    .setName("playlist")
+    .setDescription("播放一個 YouTube 或 Spotify 播放清單")
+    .addStringOption(option =>
+        option.setName("url")
+        .setDescription("輸入播放清單的 URL")
+        .setRequired(true)
+    )
+    .setRun(async (client, interaction) => {
+        // 檢查使用者是否在語音頻道中
+        const voiceChannel = interaction.member.voice.channel;
+        if (!voiceChannel) {
+            return interaction.reply({
+                embeds: [client.ErrorEmbed("您必須先加入一個語音頻道！")],
+                ephemeral: true,
+            });
         }
 
-        await interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor("#FF0000")
-              .setTitle("❌ 播放清單播放失敗")
-              .setDescription(errorMessage)
-              .addFields([
-                {
-                  name: "💡 建議解決方案",
-                  value: "• 確認播放清單 URL 正確且為公開狀態\n• 嘗試減少歌曲數量限制\n• 使用 `/play` 指令逐一添加歌曲\n• 檢查網路連線狀況",
-                  inline: false
-                }
-              ])
-              .setTimestamp()
-          ],
-          flags: 1 << 6 // Discord.MessageFlags.Ephemeral
-        });
-      }
+        // 延遲回覆，因為搜尋可能需要時間
+        await interaction.deferReply();
 
-    } catch (error) {
-      console.error(`播放清單指令錯誤:`, error);
-      
-      try {
-        await interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor("#FF0000")
-              .setTitle("❌ 指令執行失敗")
-              .setDescription(`發生未知錯誤: ${error.message}`)
-              .setTimestamp()
-          ],
-          flags: 1 << 6 // Discord.MessageFlags.Ephemeral
-        });
-      } catch (replyError) {
-        console.error("無法回應互動:", replyError);
-      }
-    }
-  });
+        const url = interaction.options.getString("url", true);
+
+        try {
+            // 使用 discord-player 搜尋播放清單
+            const searchResult = await client.player.search(url, {
+                requestedBy: interaction.user,
+                searchEngine: QueryType.AUTO, // 自動偵測來源 (YouTube, Spotify, etc.)
+            });
+
+            // 檢查是否找到播放清單
+            if (!searchResult || !searchResult.playlist) {
+                return interaction.editReply({
+                    embeds: [client.ErrorEmbed(`❌ | 找不到指定的播放清單。\n請檢查 URL 是否正確且播放清單為公開。`)],
+                });
+            }
+
+            // 將整個播放清單加入佇列
+            await client.player.play(voiceChannel, searchResult, {
+                nodeOptions: {
+                    // 將互動資訊傳遞給 player event，方便後續操作
+                    metadata: {
+                        channel: interaction.channel,
+                        client: interaction.guild.members.me,
+                        requestedBy: interaction.user,
+                    },
+                    selfDeaf: true,
+                    volume: 80, // 您可以從 config 中讀取
+                    leaveOnEmpty: true,
+                    leaveOnEmptyCooldown: 300000,
+                    leaveOnEnd: true,
+                    leaveOnEndCooldown: 300000,
+                },
+            });
+            
+            // 由於 discord-player 的事件會處理新增歌曲的通知，
+            // 這裡我們只回覆一個總的成功訊息。
+            // audioTracksAdd 事件將會發送更詳細的嵌入訊息。
+            const playlist = searchResult.playlist;
+            return interaction.editReply({
+                embeds: [client.SuccessEmbed(`已成功將播放清單 **${playlist.title}** (${playlist.tracks.length} 首歌曲) 加入佇列！`)],
+            });
+
+        } catch (e) {
+            console.error(e);
+            // 提供更詳細的錯誤訊息給使用者
+            let errorMessage = `發生未知錯誤: ${e.message}`;
+            if (e.message.includes("Could not find a match for")) {
+                errorMessage = "無法識別此 URL。請確認它是有效的 YouTube 或 Spotify 播放清單連結。";
+            } else if (e.message.includes("Sign in to view this playlist") || e.message.includes("private")) {
+                 errorMessage = "無法存取此播放清單。它可能是私人的或需要登入才能觀看。";
+            }
+            
+            return interaction.editReply({
+                embeds: [client.ErrorEmbed(errorMessage, "播放清單錯誤")]
+            });
+        }
+    });
 
 module.exports = command;

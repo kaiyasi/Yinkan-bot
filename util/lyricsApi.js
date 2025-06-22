@@ -1,5 +1,3 @@
-const lyricsFinder = require('lyrics-finder');
-
 let fetch;
 (async () => {
     try {
@@ -40,28 +38,4 @@ async function searchLyrics(query) {
     }
 }
 
-async function search(query) {
-  // 保持向後相容性
-  return await searchLyrics(query);
-}
-
-async function find(url) {
-  try {
-    // 從 URL 提取歌曲資訊並搜尋歌詞
-    const lyrics = await lyricsFinder(url);
-    
-    return {
-      name: "歌曲名稱",
-      lyrics: lyrics || "歌詞內容暫不可用",
-      icon: null
-    };
-  } catch (error) {
-    throw new Error(`取得歌詞失敗: ${error.message}`);
-  }
-}
-
-module.exports = {
-  search,
-  find,
-  searchLyrics
-};
+module.exports = { searchLyrics };

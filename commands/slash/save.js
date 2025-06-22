@@ -17,24 +17,10 @@ const command = new SlashCommand()
   .setSelfDefer(true)
   .setRun(async (client, interaction) => {
     try {
-      // 獲取播放器
-      let player;
-      if (client.player) {
-        player = client.player.nodes.get(interaction.guild.id);
-      } else {
-        return interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor("#FF0000")
-              .setTitle("❌ 播放器未初始化")
-              .setDescription("Discord Player 尚未開始")
-              .setTimestamp()
-          ],
-          ephemeral: true,
-        });
-      }
+      // 獲取播放佇列
+      const queue = client.player.nodes.get(interaction.guild.id);
 
-      if (!player || !player.queue.currentTrack) {
+      if (!queue || !queue.currentTrack) {
         return interaction.reply({
           embeds: [
             new EmbedBuilder()
@@ -47,7 +33,7 @@ const command = new SlashCommand()
         });
       }
 
-      const currentTrack = player.queue.currentTrack;
+      const currentTrack = queue.currentTrack;
 
       // 格式化時長
       let durationText = "即時播放";

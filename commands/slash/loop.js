@@ -1,63 +1,53 @@
 const SlashCommand = require("../../lib/SlashCommand");
-const { EmbedBuilder } = require("discord.js");
+const { QueueRepeatMode } = require("discord-player");
 
 const command = new SlashCommand()
     .setName("loop")
-    .setDescription("循環播放當前歌曲")
-    .setSelfDefer(true)
-    .setRun(async (client, interaction, options) => {
-        await interaction.deferReply();
+    .setDescription("設定歌曲或佇列的循環模式")
+    .setCategory("music")
+    .addStringOption(option =>
+        option.setName('mode')
+            .setDescription('選擇循環模式')
+            .setRequired(true)
+            .addChoices(
+                { name: '❌ 關閉', value: 'off' },
+                { name: '🔂 單曲循環', value: 'track' },
+                { name: '🔁 佇列循環', value: 'queue' }
+            )
+    )
+    .setRun(async (client, interaction) => {
+        const queue = client.player.nodes.get(interaction.guildId);
+        if (!queue || !queue.currentTrack) {
+            return interaction.reply({ embeds: [client.ErrorEmbed("目前沒有正在播放音樂。")], ephemeral: true });
+        }
+
+        const mode = interaction.options.getString('mode', true);
+        let newMode;
+        let replyText;
+
+        switch (mode) {
+            case 'track':
+                newMode = QueueRepeatMode.TRACK;
+                replyText = '🔂 | 單曲循環模式已啟用';
+                break;
+            case 'queue':
+                newMode = QueueRepeatMode.QUEUE;
+                replyText = '🔁 | 佇列循環模式已啟用';
+                break;
+            default:
+                newMode = QueueRepeatMode.OFF;
+                replyText = '❌ | 循環模式已關閉';
+                break;
+        }
+
+        queue.setRepeatMode(newMode);
         
-        let channel = await client.getChannel(client, interaction);
-        if (!channel) {
-            return;
+        // 更新控制器
+        if (queue.metadata?.controllerMessage) {
+            await client.updatePlayerController(queue.metadata.controllerMessage, queue).catch(()=>{});
         }
 
-        let player;
-        if (client.player) {
-            player = client.player.nodes.get(interaction.guild.id);
-        } else {
-            return interaction.editReply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor("RED")
-                        .setDescription("Lavalink 節點未連接"),
-                ],
-            });
-        }
-
-        if (!player) {
-            return interaction.editReply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor("RED")
-                        .setDescription("目前沒有正在播放內容"),
-                ],
-                ephemeral: true,
-            });
-        }
-
-        // 切換循環模式
-        const newRepeatMode = player.repeatMode === 'track' ? 'off' : 'track';
-        player.setRepeatMode(newRepeatMode);
-
-        if (newRepeatMode === 'track') {
-            return interaction.editReply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(client.config.embedColor)
-                        .setDescription(`🔂 | **單曲循環模式已啟用**`),
-                ],
-            });
-        } else {
-            return interaction.editReply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(client.config.embedColor)
-                        .setDescription(`⏹️ | **循環播放模式已關閉**`),
-                ],
-            });
-        }
+        return interaction.reply({ embeds: [client.SuccessEmbed(replyText)], ephemeral: true });
     });
 
 module.exports = command;

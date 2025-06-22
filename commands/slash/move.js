@@ -25,108 +25,63 @@ const command = new SlashCommand()
         const track = interaction.options.getInteger("track_number");
         const position = interaction.options.getInteger("new_position");
 
-        let channel = await client.getChannel(client, interaction);
-        if (!channel) {
-            return;
-        }
+        const queue = client.player.nodes.get(interaction.guild.id);
 
-        let player;
-        if (client.player) {
-            player = client.player.nodes.get(interaction.guild.id);
-        } else {
+        if (!queue || !queue.currentTrack) {
             return interaction.editReply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor("Red")
-                        .setDescription("Discord Player 未初始化"),
-                ],
+                embeds: [client.ErrorEmbed("目前沒有正在播放內容")],
             });
         }
 
-        if (!player) {
+        if (!queue.tracks || queue.tracks.size === 0) {
             return interaction.editReply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor("RED")
-                        .setDescription("目前沒有正在播放內容"),
-                ],
-            });
-        }
-
-        if (!player.queue || player.queue.size === 0) {
-            return interaction.editReply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor("RED")
-                        .setDescription("播放佇列是空的"),
-                ],
+                embeds: [client.ErrorEmbed("播放佇列是空的")],
             });
         }
 
         if (track < 1 || position < 1) {
             return interaction.editReply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor("RED")
-                        .setDescription("歌曲編號和新位置必須大於 0"),
-                ],
+                embeds: [client.ErrorEmbed("歌曲編號和新位置必須大於 0")],
             });
         }
 
-        if (track > player.queue.size || position > player.queue.size) {
+        if (track > queue.tracks.size || position > queue.tracks.size) {
             return interaction.editReply({
                 embeds: [
-                    new EmbedBuilder()
-                        .setColor("RED")
-                        .setDescription(`歌曲編號和新位置不能超過佇列長度 (${player.queue.size})`),
+                    client.ErrorEmbed(`歌曲編號和新位置不能超過佇列長度 (${queue.tracks.size})`),
                 ],
             });
         }
 
         if (track === position) {
             return interaction.editReply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor("RED")
-                        .setDescription("歌曲已經在指定位置"),
-                ],
+                embeds: [client.ErrorEmbed("歌曲已經在指定位置")],
             });
         }
 
         try {
             // 獲取要移動的歌曲
-            const tracks = player.queue.tracks.toArray();
-            const targetTrack = tracks[track - 1];
+            const targetTrack = queue.tracks.at(track - 1);
             
             if (!targetTrack) {
                 return interaction.editReply({
-                    embeds: [
-                        new EmbedBuilder()
-                            .setColor("RED")
-                            .setDescription("找不到指定的歌曲"),
-                    ],
+                    embeds: [client.ErrorEmbed("找不到指定的歌曲")],
                 });
             }
 
             // 移動歌曲
-            player.queue.remove(track - 1);
-            player.queue.insert(targetTrack, position - 1);
+            queue.tracks.remove(track - 1);
+            queue.tracks.insert(targetTrack, position - 1);
 
             return interaction.editReply({
                 embeds: [
-                    new EmbedBuilder()
-                        .setColor(client.config.embedColor)
-                        .setDescription(`🔄 | 已將歌曲 **${targetTrack.title}** 從位置 **${track}** 移動到位置 **${position}**`),
+                    client.SuccessEmbed(`🔄 | 已將歌曲 **${targetTrack.title}** 從位置 **${track}** 移動到位置 **${position}**`),
                 ],
             });
         } catch (error) {
             console.error('移動歌曲時發生錯誤:', error);
             return interaction.editReply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor("RED")
-                        .setDescription("移動歌曲時發生錯誤"),
-                ],
+                embeds: [client.ErrorEmbed("移動歌曲時發生錯誤")],
             });
         }
     });

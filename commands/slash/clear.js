@@ -4,51 +4,29 @@ const { EmbedBuilder } = require("discord.js");
 const command = new SlashCommand()
   .setName("clear")
   .setDescription("清空播放佇列")
-  .setSelfDefer(true)  .setRun(async (client, interaction, options) => {
+  .setSelfDefer(true)
+  .setRun(async (client, interaction, options) => {
     await interaction.deferReply();
     
-    let channel = await client.getChannel(client, interaction);
-    if (!channel) {
-      return;
-    }
-
-    let player;
-    if (client.player) {
-      player = client.player.nodes.get(interaction.guild.id);    } else {
+    const queue = client.player.nodes.get(interaction.guild.id);
+    if (!queue || !queue.currentTrack) {
       return interaction.editReply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor("RED")
-            .setDescription("Lavalink 節點未連接")
-        ],
-      });
-    }    if (!player) {
-      return interaction.editReply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor("RED")
-            .setDescription("目前沒有歌曲正在播放")
-        ],
+        embeds: [client.ErrorEmbed("目前沒有歌曲正在播放")],
         ephemeral: true,
       });
     }
 
-    if (!player.queue || !player.queue.length || player.queue.length === 0) {
-      let cembed = new EmbedBuilder()
-        .setColor(client.config.embedColor)
-        .setDescription("播放佇列已為空");      return interaction.editReply({
-        embeds: [cembed],
+    if (!queue.tracks || queue.tracks.data.length === 0) {
+      return interaction.editReply({
+        embeds: [client.MusicEmbed("播放佇列已為空")],
         ephemeral: true,
       });
     }
 
-    player.queue.clear();
+    queue.tracks.clear();
     
-    let clearEmbed = new EmbedBuilder()
-      .setColor(client.config.embedColor)
-      .setDescription(`📋 | 播放佇列已清空`);
-      return interaction.editReply({
-      embeds: [clearEmbed]
+    return interaction.editReply({
+      embeds: [client.SuccessEmbed("📋 | 播放佇列已清空")]
     });
   });
 
