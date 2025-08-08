@@ -1,4 +1,4 @@
-const { MessageEmbed } = require("discord.js");
+const { MessageEmbed, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 /**
  *
  * @param {import("../lib/DiscordMusicBot")} client
@@ -154,3 +154,64 @@ module.exports = async (client, interaction) => {
 		content: "❌ | **Unknown controller option**",
 	});
 };
+
+class Controller {
+    static createPlayerController(queue) {
+        const isPaused = queue?.node?.isPaused();
+        const repeatMode = queue?.repeatMode ?? 0;
+
+        let loopStyle = ButtonStyle.Secondary;
+        let loopEmoji = '➡️';
+        let loopLabel = '循環';
+
+        if (repeatMode === 1) {
+            loopStyle = ButtonStyle.Success;
+            loopEmoji = '🔂';
+            loopLabel = '單曲循環';
+        } else if (repeatMode === 2) {
+            loopStyle = ButtonStyle.Success;
+            loopEmoji = '🔁';
+            loopLabel = '佇列循環';
+        }
+
+        return new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('music_previous')
+                    .setLabel('上一首')
+                    .setEmoji('⏮️')
+                    .setStyle(ButtonStyle.Secondary)
+                    .setDisabled(!queue || !queue.history?.tracks?.data?.length),
+                
+                new ButtonBuilder()
+                    .setCustomId('music_playpause')
+                    .setLabel(isPaused ? '播放' : '暫停')
+                    .setEmoji(isPaused ? '▶️' : '⏸️')
+                    .setStyle(isPaused ? ButtonStyle.Success : ButtonStyle.Primary)
+                    .setDisabled(!queue || !queue.currentTrack),
+                
+                new ButtonBuilder()
+                    .setCustomId('music_skip')
+                    .setLabel('下一首')
+                    .setEmoji('⏭️')
+                    .setStyle(ButtonStyle.Secondary)
+                    .setDisabled(!queue || !queue.tracks?.data?.length),
+                
+                new ButtonBuilder()
+                    .setCustomId('music_loop')
+                    .setLabel(loopLabel)
+                    .setEmoji(loopEmoji)
+                    .setStyle(loopStyle)
+                    .setDisabled(!queue || !queue.currentTrack),
+
+                new ButtonBuilder()
+                    .setCustomId('music_stop')
+                    .setLabel('停止')
+                    .setEmoji('⏹️')
+                    .setStyle(ButtonStyle.Danger)
+                    .setDisabled(!queue || !queue.currentTrack)
+            );
+    }
+}
+
+module.exports = Controller;

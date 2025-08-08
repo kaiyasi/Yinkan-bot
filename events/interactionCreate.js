@@ -72,7 +72,10 @@ module.exports = {
         try {
             // 處理斜線指令
             if (interaction.isCommand()) {
-                const command = client.commands.get(interaction.commandName);
+                // 修正：使用正確的指令集合名稱
+                const command = client.slashCommands?.get(interaction.commandName) || 
+                               client.commands?.get(interaction.commandName);
+                               
                 if (!command) {
                     return await safeReply(interaction, { 
                         embeds: [client.ErrorEmbed("找不到此指令", "指令錯誤")]
@@ -109,7 +112,8 @@ module.exports = {
                     
                     // 執行命令，帶有超時控制
                     await Promise.race([
-                        command.execute(interaction, client),
+                        // 優先使用 execute 方法，如果沒有則使用 run 方法
+                        command.execute ? command.execute(interaction, client) : command.run(client, interaction),
                         new Promise((_, reject) => 
                             setTimeout(() => reject(new Error('指令執行超時')), COMMAND_TIMEOUT)
                         )
@@ -333,7 +337,7 @@ module.exports = {
             }
 
             if (interaction.isAutocomplete()) {
-                await handleAutocomplete(interaction);
+                await handleAutocomplete(interaction, client);
                 return;
             }
         } catch (error) {
@@ -526,38 +530,15 @@ async function handleVoiceChannelQuickAction(interaction, client) {
 
 // 添加自動完成處理增強功能
 
-// 添加超時處理的輔助函數
-async function withTimeout(promise, timeoutMs = 1500) {
-  return new Promise((resolve) => {
-    let timeoutHandle;
-    
-    // 設定超時
-    timeoutHandle = setTimeout(() => {
-      console.log(`⚠️ 操作超時 (${timeoutMs}ms)`);
-      resolve([{ name: '搜尋中...', value: 'searching' }]);
-    }, timeoutMs);
-    
-    // 執行實際操作
-    promise
-      .then((result) => {
-        clearTimeout(timeoutHandle);
-        resolve(result);
-      })
-      .catch((error) => {
-        clearTimeout(timeoutHandle);
-        console.error('操作失敗:', error);
-        resolve([{ name: '搜尋失敗', value: 'error' }]);
-      });
-  });
-}
-
-// 處理自動完成互動
-async function handleAutocomplete(interaction) {
+// 處理自動完成互動 - 修正client參數傳遞
+async function handleAutocomplete(interaction, client) {
   try {
     // 檢查互動是否已經回應過
     if (interaction.responded) return;
     
-    const command = interaction.client.commands.get(interaction.commandName);
+    // 修正：使用正確的指令集合名稱
+    const command = client.slashCommands?.get(interaction.commandName) || 
+                   client.commands?.get(interaction.commandName);
     
     // 如果命令不存在或沒有自動完成處理
     if (!command || !command.autocomplete) {
@@ -601,5 +582,30 @@ async function handleAutocomplete(interaction) {
       }
     }
   }
+}
+
+// 添加超時處理的輔助函數
+async function withTimeout(promise, timeoutMs = 1500) {
+  return new Promise((resolve) => {
+    let timeoutHandle;
+    
+    // 設定超時
+    timeoutHandle = setTimeout(() => {
+      console.log(`⚠️ 操作超時 (${timeoutMs}ms)`);
+      resolve([{ name: '搜尋中...', value: 'searching' }]);
+    }, timeoutMs);
+    
+    // 執行實際操作
+    promise
+      .then((result) => {
+        clearTimeout(timeoutHandle);
+        resolve(result);
+      })
+      .catch((error) => {
+        clearTimeout(timeoutHandle);
+        console.error('操作失敗:', error);
+        resolve([{ name: '搜尋失敗', value: 'error' }]);
+      });
+  });
 }
 

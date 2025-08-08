@@ -1,38 +1,38 @@
-const { join } = require("path");
-const fs = require("fs");
+const fs = require('fs');
+const path = require('path');
 
-const LoadCommands = () => {
-	return new Promise(async (resolve) => {
-		let slash = await LoadDirectory("slash");
-		let context = await LoadDirectory("context");
-		
-		resolve({ slash, context });
-	});
-};
+async function LoadCommands() {
+    const slashCommands = [];
+    
+    const slashCommandsPath = path.join(__dirname, '..', 'commands', 'slash');
+    
+    if (fs.existsSync(slashCommandsPath)) {
+        const commandFiles = fs.readdirSync(slashCommandsPath).filter(file => file.endsWith('.js'));
+        
+        for (const file of commandFiles) {
+            try {
+                const filePath = path.join(slashCommandsPath, file);
+                const command = require(filePath);
+                
+                if (command && (command.name || command.data?.name) && (command.run || command.execute)) {
+                    slashCommands.push({
+                        name: command.name || command.data.name,
+                        description: command.data?.description || command.description || 'No description',
+                        category: command.category || 'general'
+                    });
+                }
+            } catch (error) {
+                console.error(`Error loading command ${file}:`, error);
+            }
+        }
+    }
+    
+    return {
+        slash: slashCommands
+    };
+}
 
-const LoadDirectory = (dir) => {
-	return new Promise((resolve) => {
-		let commands = [];
-		let CommandsDir = join(__dirname, "..", "commands", dir);
-		
-		// 檢查目錄是否存在
-		if (!fs.existsSync(CommandsDir)) {
-			console.log(`目錄 ${dir} 不存在，跳過載入`);
-			return resolve(commands);
-		}
-		
-		fs.readdir(CommandsDir, (err, files) => {
-			if (err) {
-				console.error(`無法讀取目錄 ${dir}:`, err);
-				return resolve(commands);
-			}
-			
-			for (const file of files) {
-				try {
-					let cmd = require(CommandsDir + "/" + file);
-					if (!cmd || (dir == "context" && !cmd.command)) {
-						console.log(
-							"Unable to load Command: " +
+module.exports = LoadCommands;
 							file.split(".")[0] +
 							", File doesn't have either command",
 						);

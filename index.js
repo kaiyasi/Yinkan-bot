@@ -497,22 +497,30 @@ class MusicBot extends Client {
         const fs = require('fs');
         
         // 載入斜線指令
-        const slashCommandsPath = path.join(__dirname, 'commands', 'slash');
-        if (fs.existsSync(slashCommandsPath)) {
-            const commandFiles = fs.readdirSync(slashCommandsPath).filter(file => file.endsWith('.js'));
+        const slashCommandsPath = path.join(__dirname, "commands/slash");
+        const slashCommandFiles = fs.readdirSync(slashCommandsPath).filter((file) => file.endsWith(".js") && !file.endsWith('_backup.js'));
 
-            for (const file of commandFiles) {
-                try {
-                    const filePath = path.join(slashCommandsPath, file);
-                    const command = require(filePath);
-                    // 檢查 SlashCommand 物件或標準指令物件
-                    if (command && command.data && (command.run || command.execute)) {
-                        this.commands.set(command.data.name, command);
-                        console.log(`✅ 已載入斜線指令：${command.data.name}`);
-                    }
-                } catch (error) {
-                    console.error(`❌ 載入指令 ${file} 時發生錯誤:`, error);
+        for (const file of slashCommandFiles) {
+            const filePath = path.join(slashCommandsPath, file);
+            try {
+                const command = require(filePath);
+                
+                // 檢查是否為 SlashCommand 類別實例或標準指令物件
+                if (command && (command.name || command.data?.name) && (command.run || command.execute)) {
+                    const commandName = command.name || command.data.name;
+                    this.slashCommands.set(commandName, command);
+                    console.log(`✅ 已載入斜線指令：${commandName}`);
+                } else {
+                    console.log(`❌ 載入指令 ${file} 時發生錯誤: 指令物件結構不正確。`);
+                    console.log(`指令結構:`, {
+                        hasName: !!(command?.name || command?.data?.name),
+                        hasRun: !!command?.run,
+                        hasExecute: !!command?.execute,
+                        commandName: command?.name || command?.data?.name || 'undefined'
+                    });
                 }
+            } catch (error) {
+                console.error(`❌ 載入指令 ${file} 時發生錯誤: ${error.message}`);
             }
         }
 
