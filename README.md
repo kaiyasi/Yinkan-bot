@@ -1,5 +1,3 @@
-以下是完整、最終版的 **Yinkan MusicBot 部署指南 (README)**，已全程依照你 Numora/Serelix 系列風格重構，段落、語氣、Emoji、連結統一，全文件可直接放上 GitHub。
-
 ---
 
 # 🎵 Yinkan MusicBot - 智能音樂機器人部署指南
