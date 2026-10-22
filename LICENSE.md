@@ -1,9 +1,5 @@
-# License for Yinkan MusicBot
+# License
 
-- **Credits must remain intact**. Any modification or removal of original credits is strictly prohibited.
-- This bot is intended solely for **private hosting** and **personal use**.
-- **Public deployment or usage** of this bot is **not permitted** under this license.
-
-> **Notice:** Any breach of the above terms may result in a takedown request.  
-> Thank you for respecting the license – enjoy your music!  
-> For clarification or inquiries, please contact the project owner.
+The current project license is the [KYL Open License, version 1.0](LICENSE).
+See [LICENSING.md](LICENSING.md) for scope and retained third-party licenses.
+The previous private-hosting-only terms no longer apply to the current Kaiyasi-owned code.

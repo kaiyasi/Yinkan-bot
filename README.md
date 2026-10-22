@@ -2,7 +2,7 @@
 
 > **由 Serelix Studio 開發的跨平台音樂機器人，結合智慧推薦、情境感知與即時歌詞顯示，打造沉浸式的聆聽體驗。**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: KYL Open](https://img.shields.io/badge/License-KYL%20Open-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node.js-v18+-green.svg)](https://nodejs.org/)
 [![Discord.js](https://img.shields.io/badge/discord.js-v14+-blue.svg)](https://discord.js.org/)
 [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat\&logo=docker\&logoColor=white)](https://www.docker.com/)
@@ -266,3 +266,6 @@ docker compose logs -f yinkan-bot
 ---
 
 *Yinkan by Serelix Studio — 智慧音樂機器人平台 🎧 讓節奏流動，讓音樂更智慧。*
+
+
+See [LICENSING.md](LICENSING.md) for license scope, third-party exceptions, and earlier-version notices.
